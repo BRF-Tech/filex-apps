@@ -1,0 +1,4 @@
+{
+  "publisher": "${PUBLISHER}",
+  "summary": { "en": "A language pack the store's end-to-end tests publish." }
+}

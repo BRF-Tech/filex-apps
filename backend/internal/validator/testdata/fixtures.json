@@ -1,0 +1,59 @@
+{
+  "comment": "Real tags as GitHub served them on 2026-10-03, for the validator integration tests: the contents live in a cache on the test machine (<FAPPS_IT_FIXTURES>/<sha256>), filled once with FAPPS_IT_RECORD=1 from these addresses and checked against these hashes, so every hash the tests see is the production one. Nothing here is a made-up app.",
+  "recorded": "2026-10-03",
+  "repos": [
+    {
+      "repo": "BRF-Tech/filex-sign",
+      "tag": "v0.3.0",
+      "commit": "ac3fa19e20be574cde1a154dbfbe01f59c55d2d1",
+      "repo_id": 1386221114,
+      "owner_id": 159972728,
+      "owner_type": "Organization",
+      "license": "MIT",
+      "manifest": {
+        "url": "https://raw.githubusercontent.com/BRF-Tech/filex-sign/ac3fa19e20be574cde1a154dbfbe01f59c55d2d1/filex-app.json",
+        "sha256": "8a4be9cb90e813b8e03427a8c32008aed9d923e5c6cf772faa545cbf5076b58b",
+        "size": 31717
+      },
+      "module": {
+        "url": "https://github.com/BRF-Tech/filex-sign/releases/download/v0.3.0/plugin.wasm",
+        "sha256": "6a3d2e59aaadb9c69bd219652d2078787e09520f9b7da223646e9dd131396ff3",
+        "size": 21793247
+      }
+    },
+    {
+      "repo": "BRF-Tech/filex-convert",
+      "tag": "v0.2.0",
+      "commit": "a11dd275478e881de34fc07a8854f9dfc790929d",
+      "repo_id": 1386218494,
+      "owner_id": 159972728,
+      "owner_type": "Organization",
+      "license": "MIT",
+      "manifest": {
+        "url": "https://raw.githubusercontent.com/BRF-Tech/filex-convert/a11dd275478e881de34fc07a8854f9dfc790929d/filex-app.json",
+        "sha256": "828ceab850c2c9109cd819d015b03416dcea80161dc1eb6ee547c7eb4a48a9e8",
+        "size": 10039
+      },
+      "module": {
+        "url": "https://github.com/BRF-Tech/filex-convert/releases/download/v0.2.0/plugin.wasm",
+        "sha256": "e8786f26cf19974e65f0423e0d666bca72281e562deb962cd0668e5383a602d9",
+        "size": 15210128
+      }
+    },
+    {
+      "repo": "BRF-Tech/filex-lang-es",
+      "tag": "v0.1.7",
+      "commit": "9a639edb06fdf9c111bd6fd3f411e1dcaf317f10",
+      "repo_id": 1386185347,
+      "owner_id": 159972728,
+      "owner_type": "Organization",
+      "license": "MIT",
+      "note": "the repository has no tag yet (ARCHITECTURE.md Q6): its main commit of 2026-10-03 is served under the tag the store requires; the bytes are GitHub's",
+      "manifest": {
+        "url": "https://raw.githubusercontent.com/BRF-Tech/filex-lang-es/9a639edb06fdf9c111bd6fd3f411e1dcaf317f10/filex-app.json",
+        "sha256": "570ae0bb3b0bedcd81269694be3c56ffa0d44a3f65c0b8ae87a7e61218c14abd",
+        "size": 449631
+      }
+    }
+  ]
+}

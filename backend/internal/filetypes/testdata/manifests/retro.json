@@ -1,0 +1,98 @@
+{
+  "manifest_version": 1,
+  "name": "retro",
+  "version": "0.1.0",
+  "filex": ">=0.51.0",
+  "label": {
+    "en": "Retro",
+    "tr": "Retro"
+  },
+  "description": {
+    "en": "Plays the DOOM-engine WAD files and the js-dos bundles you bring, in place of the preview. No game data ships with it. Saved games are kept in files, with filex's version history.",
+    "tr": "Getirdiğiniz DOOM motoru WAD dosyalarını ve js-dos paketlerini önizlemenin yerinde oynatır. Yanında oyun verisi gelmez. Oyun kayıtları dosyalarda, filex'in sürüm geçmişiyle saklanır."
+  },
+  "homepage": "https://github.com/BRF-Tech/filex-retro",
+  "languages": [
+    "en",
+    "tr"
+  ],
+  "permissions": [
+    "files:read",
+    "files:write"
+  ],
+  "permission_reasons": {
+    "files:read": {
+      "en": "To read the game you open.",
+      "tr": "Açtığınız oyunu okumak için."
+    },
+    "files:write": {
+      "en": "To write your saved games into the game's bundle or pack as a new version, or into a new pack where you choose.",
+      "tr": "Oyun kayıtlarınızı oyunun paketine yeni sürüm olarak ya da seçtiğiniz yerde yeni bir pakete yazmak için."
+    },
+    "ui": {
+      "en": "The players run in the app's own page, in the sandbox filex draws for it.",
+      "tr": "Oynatıcılar, filex'in onlar için çizdiği yalıtım alanında, uygulamanın kendi sayfasında çalışır."
+    },
+    "ui:wasm-eval": {
+      "en": "The game engines are WebAssembly.",
+      "tr": "Oyun motorları WebAssembly'dir."
+    },
+    "ui:package-fetch": {
+      "en": "To load the engines from this app's own package.",
+      "tr": "Motorları uygulamanın kendi paketinden yüklemek için."
+    },
+    "ui-viewer:.wad": {
+      "en": "So that a DOOM-engine WAD opens as a game.",
+      "tr": "DOOM motoru WAD dosyası oyun olarak açılsın diye."
+    },
+    "ui-viewer:.fxdoom": {
+      "en": "So that a saved DOOM-engine pack opens as a game.",
+      "tr": "Kayıtlı DOOM motoru paketi oyun olarak açılsın diye."
+    },
+    "ui-viewer:.jsdos": {
+      "en": "So that a js-dos bundle opens as a DOS game.",
+      "tr": "js-dos paketi DOS oyunu olarak açılsın diye."
+    }
+  },
+  "ui": {
+    "bundle": {
+      "url": "https://github.com/BRF-Tech/filex-retro/releases/download/{tag}/ui.zip",
+      "sha256": "ea2dbd942ef5ba689a27a6b5e7c4d4ef0e542c246abdcb4620fa509f468bfba0"
+    },
+    "csp": [
+      "wasm-unsafe-eval"
+    ],
+    "package_fetch": true
+  },
+  "views": [
+    {
+      "id": "doom",
+      "placement": "viewer",
+      "ui": "doom.html",
+      "label": {
+        "en": "DOOM-engine player",
+        "tr": "DOOM motoru oynatıcı"
+      },
+      "applies": {
+        "ext": [
+          "wad",
+          "fxdoom"
+        ]
+      }
+    },
+    {
+      "id": "dos",
+      "placement": "viewer",
+      "ui": "dos.html",
+      "label": {
+        "en": "DOS player",
+        "tr": "DOS oynatıcı"
+      },
+      "applies": {
+        "ext": [
+          "jsdos"
+        ]
+      }
+    }
+  ]
+}

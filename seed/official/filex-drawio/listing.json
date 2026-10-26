@@ -1,0 +1,13 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["productivity", "documents"],
+  "summary": {
+    "en": "Draw and edit diagrams (.drawio, .dio) with the draw.io editor, inside filex. Save writes a new version of the file; New document gets a draw.io diagram row."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/editing.png", "caption": {"en": "A diagram open in draw.io inside filex"}},
+    {"path": "screenshots/new-document.png", "caption": {"en": "The New document dialog with the draw.io diagram row"}}
+  ]
+}

@@ -1,0 +1,154 @@
+# filex Apps - a store of your own, in production: the store, its database,
+# Redis, two filex validators and the storage plugin validator.
+#
+#   cp .env.example .env        then fill it in
+#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out" \
+#     ghcr.io/brf-tech/filex-apps:<version> keygen -out /out/keys.env
+#                               the store's keys, made once (mode 0600)
+#   docker compose up -d
+#
+# Step by step, with the GitHub OAuth App, the administrators, the reverse
+# proxy, backups and updates: docs/SELF-HOSTING.md.
+#
+# - app: one process (API, workers, the web interface). It applies its
+#   migrations at start and serves HTTP on :8080, published on loopback only
+#   (FAPPS_BIND): put an HTTPS reverse proxy in front of it. Its settings come
+#   from .env and keys.env (env_file: every FAPPS_* there reaches it).
+# - postgres: the store's own database. Everything durable lives here, the
+#   media bytes included: back it up together with keys.env.
+# - redis: rate-limit counters only, no persistence. Without it the store
+#   counts in its own memory.
+# - filex-latest, filex-floor: the validators - real filex servers the store
+#   asks for the install review (a dry run) of every submission, at the newest
+#   filex release and at the previous minor. They hold no data (tmpfs), take
+#   no traffic from outside and share a network with the app only. Move both
+#   image lines at each filex release.
+# - plugin-latest: filex's storage plugin validator (filex 0.55 and later). No
+#   network at all: a build comes in and the result goes out through the
+#   plugin-spool volume it shares with the app. Its image line moves with
+#   filex-latest.
+name: fapps
+
+x-validator: &validator
+  restart: unless-stopped
+  environment:
+    FILEX_ADMIN_EMAIL: validator@local
+    FILEX_ADMIN_PASSWORD: ${FAPPS_VALIDATOR_PASSWORD:?set FAPPS_VALIDATOR_PASSWORD in .env}
+    FILEX_PLUGINS_DISABLED: "1"
+    FILEX_APP_PLUGINS_DISABLED: "0"
+  tmpfs:
+    - /data
+  deploy:
+    resources:
+      limits:
+        memory: 768m
+
+services:
+  app:
+    image: ghcr.io/brf-tech/filex-apps:${FAPPS_VERSION:?set FAPPS_VERSION in .env (a release, e.g. 0.1.0)}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      filex-latest:
+        condition: service_started
+      filex-floor:
+        condition: service_started
+    ports:
+      - "${FAPPS_BIND:-127.0.0.1:8080}:8080"
+    env_file:
+      - .env
+      - keys.env
+    environment:
+      APP_ENV: production
+      FAPPS_LISTEN: 0.0.0.0:8080
+      DATABASE_URL: postgresql://fapps:${FAPPS_DB_PASSWORD:?set FAPPS_DB_PASSWORD in .env}@postgres:5432/fapps?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      FAPPS_VALIDATORS: latest=http://filex-latest:5212,floor=http://filex-floor:5212
+      FAPPS_VALIDATOR_EMAIL: validator@local
+      FAPPS_PLUGIN_VALIDATORS: plugins=/spool/latest
+    volumes:
+      - plugin-spool:/spool/latest
+      # Your logo (FAPPS_STORE_LOGO=/branding/<file>): uncomment and put the
+      # SVG or PNG in ./branding next to this file.
+      # - ./branding:/branding:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fapps
+      POSTGRES_PASSWORD: ${FAPPS_DB_PASSWORD:?set FAPPS_DB_PASSWORD in .env}
+      POSTGRES_DB: fapps
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "fapps", "-d", "fapps"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  redis:
+    image: redis:7.4.11-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "32mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+  filex-latest:
+    <<: *validator
+    image: ghcr.io/brf-tech/filex:v0.57.3
+
+  filex-floor:
+    <<: *validator
+    image: ghcr.io/brf-tech/filex:v0.56.0
+
+  # filex's storage plugin validator. What each flag and capability is for:
+  # docs/DEPLOY.md "The plugin validator". filex's image asks
+  # 127.0.0.1:5212/healthz for its health, which this mode does not serve (no
+  # HTTP, no network); health is its heartbeat file instead.
+  plugin-latest:
+    image: ghcr.io/brf-tech/filex:v0.57.3
+    command: ["plugin-validator", "--spool", "/spool", "--work-dir", "/work", "--store-uid", "65532",
+              "--plugin-uid", "65534", "--plugin-gid", "65534"]
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /work:exec,mode=0711,size=1g
+      - /tmp:mode=1777,size=256m
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    cpus: 1.0
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /spool/status.json) )) -lt 60"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - plugin-spool:/spool
+
+volumes:
+  pg-data:
+  plugin-spool:

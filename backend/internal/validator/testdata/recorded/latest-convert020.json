@@ -1,0 +1,131 @@
+{
+ "compat": {
+  "filex": "0.50.0",
+  "ok": true,
+  "requires": ">=0.50.0, >=0.50.0"
+ },
+ "engine": true,
+ "engines_missing": [
+  {
+   "id": "office",
+   "kind": "office",
+   "name": "ONLYOFFICE"
+  }
+ ],
+ "kind": "app",
+ "manifest": {
+  "_trimmed": "recorded answer; the manifest is cut to the fields the store reads",
+  "filex": ">=0.50.0",
+  "manifest_version": 1,
+  "min_filex": "0.50.0",
+  "name": "convert",
+  "permissions": [
+   "files:read",
+   "files:write",
+   "engines:ffmpeg",
+   "engines:imagemagick",
+   "engines:office",
+   "engines:ghostscript",
+   "engines:poppler",
+   "engines:rsvg"
+  ],
+  "version": "0.2.0",
+  "wasm": {
+   "sha256": "e8786f26cf19974e65f0423e0d666bca72281e562deb962cd0668e5383a602d9",
+   "url": "https://github.com/BRF-Tech/filex-convert/releases/download/{tag}/plugin.wasm"
+  }
+ },
+ "permissions": [
+  {
+   "id": "files:read",
+   "label": "Reads the contents of the files it is opened or run on, and of the files it keeps records about",
+   "reason": {
+    "de": "Um die Dateien zu lesen, die Sie zum Konvertieren ausgewählt haben.",
+    "en": "To read the files you selected for conversion.",
+    "es": "Para leer los archivos que seleccionó para convertir.",
+    "fr": "Pour lire les fichiers que vous avez sélectionnés pour la conversion.",
+    "tr": "Dönüştürmek için seçtiğiniz dosyaları okumak için."
+   }
+  },
+  {
+   "id": "files:write",
+   "label": "Writes files next to the one it is run on, into a folder you choose, or as that file's new version",
+   "reason": {
+    "de": "Um die konvertierte Datei neben das Original zu schreiben.",
+    "en": "To write the converted file next to the original.",
+    "es": "Para escribir el archivo convertido junto al original.",
+    "fr": "Pour écrire le fichier converti à côté de l’original.",
+    "tr": "Dönüştürülen dosyayı özgün dosyanın yanına yazmak için."
+   }
+  },
+  {
+   "id": "engines:ffmpeg",
+   "label": "Runs the server's conversion engine: FFmpeg",
+   "reason": {
+    "de": "Video- und Audiokonvertierungen (mp4, mkv, webm, wmv, mp3, flac, …), animierte GIF/WebP/APNG, Videobilder, Wellenform- und Spektrogrammbilder, Standbild- und Diashow-Videos, ASS-Untertitel.",
+    "en": "Video and audio conversions (mp4, mkv, webm, wmv, mp3, flac, …), animated GIF/WebP/APNG, video frames, waveform and spectrogram pictures, still-image and slideshow videos, ASS subtitles.",
+    "es": "Conversiones de video y audio (mp4, mkv, webm, wmv, mp3, flac, …), GIF/WebP/APNG animados, fotogramas de video, imágenes de forma de onda y espectrograma, videos de imagen fija y de presentación, subtítulos ASS.",
+    "fr": "Conversions vidéo et audio (mp4, mkv, webm, wmv, mp3, flac, …), GIF/WebP/APNG animés, images extraites de vidéos, images de forme d’onde et de spectrogramme, vidéos d’image fixe et de diaporama, sous-titres ASS.",
+    "tr": "Video ve ses dönüşümleri (mp4, mkv, webm, wmv, mp3, flac, …), hareketli GIF/WebP/APNG, video kareleri, dalga biçimi ve spektrogram resimleri, sabit görsel ve slayt videoları, ASS altyazıları."
+   }
+  },
+  {
+   "id": "engines:imagemagick",
+   "label": "Runs the server's conversion engine: ImageMagick",
+   "reason": {
+    "de": "Bildformate, die Go nicht selbst dekodieren kann (HEIC, AVIF, PSD, XCF, DDS, EXR), und Ausgabe als AVIF/PSD/DDS/EXR.",
+    "en": "Image formats Go cannot decode on its own (HEIC, AVIF, PSD, XCF, DDS, EXR) and AVIF/PSD/DDS/EXR output.",
+    "es": "Formatos de imagen que Go no puede decodificar por sí solo (HEIC, AVIF, PSD, XCF, DDS, EXR) y salida AVIF/PSD/DDS/EXR.",
+    "fr": "Formats d’image que Go ne sait pas décoder seul (HEIC, AVIF, PSD, XCF, DDS, EXR) et sortie AVIF/PSD/DDS/EXR.",
+    "tr": "Go'nun kendi başına çözemediği görsel biçimleri (HEIC, AVIF, PSD, XCF, DDS, EXR) ve AVIF/PSD/DDS/EXR çıktısı."
+   }
+  },
+  {
+   "id": "engines:office",
+   "label": "Runs the server's conversion engine: ONLYOFFICE",
+   "reason": {
+    "de": "Office-Dokumente mit ihrem Layout, über den mit filex verbundenen ONLYOFFICE Document Server: Word, Excel, PowerPoint und OpenDocument nach PDF (auch PDF/A), EPUB und untereinander (ohne ihn werden Word/ODT/RTF/PPTX weiterhin in der Sandbox konvertiert, aber nur mit Text und Tabellen).",
+    "en": "Office documents with their layout, through the ONLYOFFICE Document Server connected to filex: Word, Excel, PowerPoint and OpenDocument to PDF (PDF/A too), EPUB and to each other (without it, Word/ODT/RTF/PPTX still convert in the sandbox with text and tables only).",
+    "es": "Documentos de Office con su diseño, mediante el ONLYOFFICE Document Server conectado a filex: Word, Excel, PowerPoint y OpenDocument a PDF (también PDF/A), EPUB y entre sí (sin él, Word/ODT/RTF/PPTX se siguen convirtiendo en el entorno aislado, solo con texto y tablas).",
+    "fr": "Documents Office avec leur mise en page, via l’ONLYOFFICE Document Server connecté à filex : Word, Excel, PowerPoint et OpenDocument vers PDF (PDF/A compris), EPUB et entre eux (sans lui, Word/ODT/RTF/PPTX restent convertis dans le bac à sable, mais seulement avec le texte et les tableaux).",
+    "tr": "Ofis belgeleri sayfa düzeniyle, filex'e bağlı ONLYOFFICE Document Server üzerinden: Word, Excel, PowerPoint ve OpenDocument'tan PDF'e (PDF/A da), EPUB'a ve birbirine (bağlı değilken Word/ODT/RTF/PPTX kum havuzunda yalnız metin ve tablolarla dönüşür)."
+   }
+  },
+  {
+   "id": "engines:ghostscript",
+   "label": "Runs the server's conversion engine: Ghostscript",
+   "reason": {
+    "de": "PDF-Komprimierung, PDF/A, PostScript/EPS-Konvertierungen und PDF-Seiten als Bilder, wenn poppler fehlt.",
+    "en": "PDF compression, PDF/A, PostScript/EPS conversions and PDF pages to images when poppler is absent.",
+    "es": "Compresión de PDF, PDF/A, conversiones de PostScript/EPS y páginas de PDF a imágenes cuando falta poppler.",
+    "fr": "Compression PDF, PDF/A, conversions PostScript/EPS et pages PDF en images en l’absence de poppler.",
+    "tr": "PDF sıkıştırma, PDF/A, PostScript/EPS dönüşümleri ve poppler yokken PDF sayfalarını görsele çevirmek için."
+   }
+  },
+  {
+   "id": "engines:poppler",
+   "label": "Runs the server's conversion engine: Poppler",
+   "reason": {
+    "de": "PDF-Seiten nach PNG/JPEG/TIFF/SVG/EPS und Textextraktion aus PDFs.",
+    "en": "PDF pages to PNG/JPEG/TIFF/SVG/EPS and PDF text extraction.",
+    "es": "Páginas de PDF a PNG/JPEG/TIFF/SVG/EPS y extracción de texto de PDF.",
+    "fr": "Pages PDF vers PNG/JPEG/TIFF/SVG/EPS et extraction du texte des PDF.",
+    "tr": "PDF sayfalarını PNG/JPEG/TIFF/SVG/EPS'e ve PDF'ten metin çıkarmak için."
+   }
+  },
+  {
+   "id": "engines:rsvg",
+   "label": "Runs the server's conversion engine: librsvg",
+   "reason": {
+    "de": "Rendern von SVG nach PNG, PDF, PostScript und EPS.",
+    "en": "SVG to PNG, PDF, PostScript and EPS rendering.",
+    "es": "Representación de SVG a PNG, PDF, PostScript y EPS.",
+    "fr": "Rendu de SVG en PNG, PDF, PostScript et EPS.",
+    "tr": "SVG'yi PNG, PDF, PostScript ve EPS'e çizmek için."
+   }
+  }
+ ],
+ "signed": false,
+ "wasm_bytes": 15210128,
+ "wasm_sha256": "e8786f26cf19974e65f0423e0d666bca72281e562deb962cd0668e5383a602d9"
+}

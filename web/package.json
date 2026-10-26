@@ -1,0 +1,43 @@
+{
+  "name": "@brftech/filex-apps-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "filex Apps store - the Vue 3 SPA embedded into the Go server",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "vite",
+    "mock": "node --experimental-strip-types mock/server.ts",
+    "gen:api": "openapi-typescript ../api/openapi.yaml --empty-objects-unknown -o src/api/schema.d.ts",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "browser": "playwright test -c browser/playwright.config.ts"
+  },
+  "dependencies": {
+    "@brftech/filex-core": "0.50.0",
+    "dompurify": "^3.4.2",
+    "lucide-vue-next": "^0.453.0",
+    "vue": "^3.5.12",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "1.59.1",
+    "@types/node": "^22.7.0",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/test-utils": "^2.4.6",
+    "@vue/tsconfig": "^0.5.1",
+    "happy-dom": "^15.11.7",
+    "openapi-typescript": "^7.4.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9",
+    "vue-tsc": "^2.1.10"
+  }
+}

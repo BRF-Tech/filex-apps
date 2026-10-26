@@ -1,0 +1,2523 @@
+{
+  "filex": "0.57.3",
+  "tag": "v0.57.3",
+  "commit": "6ca679fbe5d5bb5b4434ddcb69f865d63aae586f",
+  "generated_by": "scripts/gen-filex-builtin.mjs",
+  "engines": {
+    "office": {
+      "label": "ONLYOFFICE",
+      "kind": "service",
+      "setting": "FILEX_ONLYOFFICE_URL with FILEX_ONLYOFFICE_JWT, or Admin > External services"
+    },
+    "drawio": {
+      "label": "draw.io",
+      "kind": "service",
+      "setting": "FILEX_DRAWIO_URL"
+    },
+    "ffmpeg": {
+      "label": "ffmpeg",
+      "kind": "tool",
+      "in_image": true
+    },
+    "ghostscript": {
+      "label": "Ghostscript or poppler",
+      "kind": "tool",
+      "in_image": true
+    },
+    "imagemagick": {
+      "label": "ImageMagick with libheif",
+      "kind": "tool",
+      "in_image": true
+    },
+    "sevenzip": {
+      "label": "7-Zip",
+      "kind": "tool",
+      "setting": "FILEX_ARCHIVE_7Z_BIN",
+      "in_image": true
+    },
+    "sevenzip-rar": {
+      "label": "7-Zip with RAR support",
+      "kind": "tool",
+      "setting": "FILEX_ARCHIVE_7Z_BIN",
+      "in_image": false
+    }
+  },
+  "types": {
+    "7z": {
+      "can": [
+        {
+          "do": "browse",
+          "needs": "sevenzip",
+          "via": "archive list"
+        }
+      ]
+    },
+    "aac": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "avi": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "avif": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "imagemagick"
+        }
+      ]
+    },
+    "bash": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "bmp": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "bz2": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        }
+      ]
+    },
+    "c": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "cfg": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "cjs": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "conf": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "cpp": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "cs": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "css": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "csv": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "table view"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "dart": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "diff": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        }
+      ]
+    },
+    "dio": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "drawio",
+          "via": "draw.io"
+        },
+        {
+          "do": "edit",
+          "needs": "drawio",
+          "via": "draw.io"
+        }
+      ]
+    },
+    "doc": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "dockerfile": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "docm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "docx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "dot": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "dotm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "dotx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "dps": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "dpt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "drawio": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "drawio",
+          "via": "draw.io"
+        },
+        {
+          "do": "edit",
+          "needs": "drawio",
+          "via": "draw.io"
+        },
+        {
+          "do": "create",
+          "needs": "drawio"
+        }
+      ]
+    },
+    "editorconfig": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "env": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "epub": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "e-book viewer"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "et": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ett": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "fish": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        }
+      ]
+    },
+    "flac": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "fodp": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "fods": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "fodt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "gif": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "gitignore": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "glb": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "3D viewer"
+        }
+      ]
+    },
+    "gltf": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "3D viewer"
+        }
+      ]
+    },
+    "go": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "gql": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "gradle": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "graphql": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "gz": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        }
+      ]
+    },
+    "h": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "heic": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "imagemagick"
+        }
+      ]
+    },
+    "heif": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "imagemagick"
+        }
+      ]
+    },
+    "hpp": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "htm": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "html": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "ini": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "ipynb": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "notebook viewer"
+        }
+      ]
+    },
+    "java": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "jpeg": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "jpg": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "js": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "json": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "jsonc": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "jsx": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "kt": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "less": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "log": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "lua": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "m4a": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "m4v": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "markdown": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "Markdown"
+        },
+        {
+          "do": "edit",
+          "via": "Markdown editor"
+        },
+        {
+          "do": "thumbnail",
+          "via": "first lines"
+        }
+      ]
+    },
+    "md": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "Markdown"
+        },
+        {
+          "do": "edit",
+          "via": "Markdown editor"
+        },
+        {
+          "do": "thumbnail",
+          "via": "first lines"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "mermaid": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "Mermaid"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "mht": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "mhtml": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "mjs": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "mkv": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "mmd": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "Mermaid"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "mov": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "mp3": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "mp4": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "numbers": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "odg": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "odp": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "ods": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "odt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "ogg": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "ogv": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "opus": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "otp": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ots": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ott": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "pages": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "patch": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        }
+      ]
+    },
+    "pdf": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "the browser's PDF viewer"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ghostscript"
+        }
+      ]
+    },
+    "php": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "pl": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "png": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "pot": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "potm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "potx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "pps": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ppsm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ppsx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "ppt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "pptm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "pptx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "properties": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "psd": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "Photoshop viewer"
+        }
+      ]
+    },
+    "py": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "r": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "text view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "rar": {
+      "can": [
+        {
+          "do": "browse",
+          "needs": "sevenzip-rar",
+          "via": "archive list"
+        }
+      ]
+    },
+    "rb": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "rs": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "rtf": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "sass": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "scss": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "sh": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "sql": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "stw": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "svelte": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "svg": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail",
+          "via": "SVG engine"
+        }
+      ]
+    },
+    "swift": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "sxc": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "sxi": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "sxw": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "tar": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "tar.bz2": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "tar.gz": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "tar.xz": {
+      "can": [
+        {
+          "do": "browse",
+          "needs": "sevenzip",
+          "via": "archive list"
+        }
+      ]
+    },
+    "tbz": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "tbz2": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "text": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "via": "first lines"
+        }
+      ]
+    },
+    "tgz": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "tif": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "TIFF viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "tiff": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "TIFF viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "toml": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "ts": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "tsv": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "table view"
+        }
+      ]
+    },
+    "tsx": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "txt": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "thumbnail",
+          "via": "first lines"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "txz": {
+      "can": [
+        {
+          "do": "browse",
+          "needs": "sevenzip",
+          "via": "archive list"
+        }
+      ]
+    },
+    "vsdx": {
+      "can": [
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "vue": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "wav": {
+      "can": [
+        {
+          "do": "play",
+          "via": "audio player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "webm": {
+      "can": [
+        {
+          "do": "play",
+          "via": "video player"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "ffmpeg"
+        }
+      ]
+    },
+    "webp": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "image viewer"
+        },
+        {
+          "do": "thumbnail"
+        }
+      ]
+    },
+    "wps": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "wpt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xls": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xlsb": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xlsm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xlsx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "create",
+          "needs": "office"
+        }
+      ]
+    },
+    "xlt": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xltm": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xltx": {
+      "can": [
+        {
+          "do": "preview",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "edit",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        },
+        {
+          "do": "thumbnail",
+          "needs": "office",
+          "via": "ONLYOFFICE"
+        }
+      ]
+    },
+    "xml": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "xz": {
+      "can": [
+        {
+          "do": "browse",
+          "needs": "sevenzip",
+          "via": "archive list"
+        }
+      ]
+    },
+    "yaml": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        },
+        {
+          "do": "create"
+        }
+      ]
+    },
+    "yml": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    },
+    "zip": {
+      "can": [
+        {
+          "do": "browse",
+          "via": "archive list"
+        },
+        {
+          "do": "thumbnail",
+          "via": "file list"
+        }
+      ]
+    },
+    "zsh": {
+      "can": [
+        {
+          "do": "preview",
+          "via": "code view"
+        },
+        {
+          "do": "edit",
+          "via": "code editor"
+        }
+      ]
+    }
+  },
+  "mimes": {
+    "7z": "application/x-7z-compressed",
+    "aac": "audio/aac",
+    "apk": "application/vnd.android.package-archive",
+    "arw": "image/x-sony-arw",
+    "avi": "video/x-msvideo",
+    "avif": "image/avif",
+    "bmp": "image/bmp",
+    "bz2": "application/x-bzip2",
+    "cr2": "image/x-canon-cr2",
+    "css": "text/css",
+    "csv": "text/csv",
+    "deb": "application/vnd.debian.binary-package",
+    "dio": "application/vnd.jgraph.mxfile",
+    "dng": "image/x-adobe-dng",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "drawio": "application/vnd.jgraph.mxfile",
+    "epub": "application/epub+zip",
+    "excalidraw": "application/vnd.excalidraw+json",
+    "fig": "application/x-figma",
+    "flac": "audio/flac",
+    "gif": "image/gif",
+    "glb": "model/gltf-binary",
+    "gltf": "model/gltf+json",
+    "gz": "application/gzip",
+    "heic": "image/heic",
+    "heif": "image/heif",
+    "htm": "text/html",
+    "html": "text/html",
+    "ico": "image/x-icon",
+    "ini": "text/plain",
+    "iso": "application/x-iso9660-image",
+    "jar": "application/java-archive",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "js": "text/javascript",
+    "json": "application/json",
+    "jxl": "image/jxl",
+    "log": "text/plain",
+    "m4a": "audio/mp4",
+    "m4v": "video/mp4",
+    "md": "text/markdown",
+    "mkv": "video/x-matroska",
+    "mov": "video/quicktime",
+    "mp3": "audio/mpeg",
+    "mp4": "video/mp4",
+    "nef": "image/x-nikon-nef",
+    "nupkg": "application/zip",
+    "obj": "model/obj",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "ogg": "audio/ogg",
+    "ogv": "video/ogg",
+    "opus": "audio/opus",
+    "otf": "font/otf",
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "ppt": "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "psd": "image/vnd.adobe.photoshop",
+    "rar": "application/vnd.rar",
+    "rpm": "application/x-rpm",
+    "rtf": "application/rtf",
+    "stl": "model/stl",
+    "svg": "image/svg+xml",
+    "tar": "application/x-tar",
+    "tgz": "application/gzip",
+    "tif": "image/tiff",
+    "tiff": "image/tiff",
+    "toml": "application/toml",
+    "tsv": "text/tab-separated-values",
+    "ttf": "font/ttf",
+    "txt": "text/plain",
+    "vsix": "application/zip",
+    "wav": "audio/wav",
+    "webm": "video/webm",
+    "webp": "image/webp",
+    "whl": "application/zip",
+    "wma": "audio/x-ms-wma",
+    "wmv": "video/x-ms-wmv",
+    "woff": "font/woff",
+    "woff2": "font/woff2",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xml": "application/xml",
+    "xpi": "application/x-xpinstall",
+    "xz": "application/x-xz",
+    "yaml": "application/yaml",
+    "yml": "application/yaml",
+    "zip": "application/zip",
+    "zst": "application/zstd"
+  },
+  "sources": [
+    {
+      "what": "images the preview shows in an <img>",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "275"
+    },
+    {
+      "what": "videos the preview plays",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "276"
+    },
+    {
+      "what": "audio the preview plays",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "277"
+    },
+    {
+      "what": "PDF in the browser's own viewer",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "434"
+    },
+    {
+      "what": "Markdown, rendered",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "438"
+    },
+    {
+      "what": "code and text, highlighted",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "279-297"
+    },
+    {
+      "what": "plain text",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "300"
+    },
+    {
+      "what": "the other viewers, by extension",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "312-353"
+    },
+    {
+      "what": "office documents preview in ONLYOFFICE (the server's rule)",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "446"
+    },
+    {
+      "what": "other text the server saves: the plain text view and editor",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "450"
+    },
+    {
+      "what": "the Edit button: an office document, or text the server saves that no show-only viewer takes",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "576-584"
+    },
+    {
+      "what": "the viewers offered Edit on what they show",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "574"
+    },
+    {
+      "what": "in edit mode a source viewer's text opens in the text editor",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "442-444"
+    },
+    {
+      "what": "the viewers whose Edit opens their source in the text editor",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "359"
+    },
+    {
+      "what": "the viewers handed a save address (save-text)",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "507-513"
+    },
+    {
+      "what": "the 3D formats the 3D viewer draws",
+      "path": "packages/core/src/viewers/Viewer3D.vue",
+      "lines": "33"
+    },
+    {
+      "what": "the types the document server opens (ONLYOFFICE's own mapping)",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "33-43"
+    },
+    {
+      "what": "the same types, as the list the published rule is made from",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "47-51"
+    },
+    {
+      "what": "fixed-layout types: not office documents",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "55"
+    },
+    {
+      "what": "text the built-in editor opens and save-text saves",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "77-92"
+    },
+    {
+      "what": "an office document: the document server's, not fixed-layout, not text",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "133-134"
+    },
+    {
+      "what": "what the server publishes as edit_kinds",
+      "path": "backend/internal/editkind/editkind.go",
+      "lines": "160-166"
+    },
+    {
+      "what": "checked against: the published rule as the server's tests hold it",
+      "path": "backend/internal/api/handlers/testdata/rule-mirrors.json",
+      "lines": "3"
+    },
+    {
+      "what": "kinds ONLYOFFICE also opens (and edits)",
+      "path": "backend/internal/assoc/assoc.go",
+      "lines": "77"
+    },
+    {
+      "what": "a kind ONLYOFFICE also opens, open there",
+      "path": "packages/core/src/modals/PreviewModal.vue",
+      "lines": "425"
+    },
+    {
+      "what": "filex's media type of each extension",
+      "path": "backend/internal/assoc/kinds.go",
+      "lines": "13-55"
+    },
+    {
+      "what": "thumbnails: the type of each extension",
+      "path": "backend/internal/thumb/pipeline.go",
+      "lines": "469-507"
+    },
+    {
+      "what": "thumbnails of text: the first lines",
+      "path": "backend/internal/thumb/text.go",
+      "lines": "21"
+    },
+    {
+      "what": "thumbnails of office documents, by ONLYOFFICE",
+      "path": "backend/internal/thumb/office.go",
+      "lines": "150-158"
+    },
+    {
+      "what": "a .key is drawn only when it is a Keynote package",
+      "path": "backend/internal/thumb/office.go",
+      "lines": "172"
+    },
+    {
+      "what": "thumbnails of archives: their file list",
+      "path": "backend/internal/thumb/archive.go",
+      "lines": "68-81"
+    },
+    {
+      "what": "image formats Go decodes",
+      "path": "backend/internal/thumb/image.go",
+      "lines": "3-21"
+    },
+    {
+      "what": "JPEG decoder",
+      "path": "backend/internal/thumb/jpegout.go",
+      "lines": "8"
+    },
+    {
+      "what": "SVG drawn by the SVG engine",
+      "path": "backend/internal/thumb/pipeline.go",
+      "lines": "510"
+    },
+    {
+      "what": "HEIF and AVIF need ImageMagick",
+      "path": "backend/internal/thumb/notool.go",
+      "lines": "114-120"
+    },
+    {
+      "what": "video needs ffmpeg",
+      "path": "backend/internal/thumb/notool.go",
+      "lines": "58-59"
+    },
+    {
+      "what": "audio needs ffmpeg",
+      "path": "backend/internal/thumb/notool.go",
+      "lines": "60-61"
+    },
+    {
+      "what": "PDF needs Ghostscript or poppler",
+      "path": "backend/internal/thumb/notool.go",
+      "lines": "62-63"
+    },
+    {
+      "what": "archives filex extracts by itself",
+      "path": "backend/internal/archivecli/archivecli.go",
+      "lines": "400-401"
+    },
+    {
+      "what": "archives 7-Zip extracts",
+      "path": "backend/internal/archivecli/archivecli.go",
+      "lines": "404-405"
+    },
+    {
+      "what": "RAR, when the 7-Zip found has it",
+      "path": "backend/internal/archivecli/archivecli.go",
+      "lines": "417"
+    },
+    {
+      "what": "archives the explorer offers to open and extract",
+      "path": "packages/core/src/FileExplorer.vue",
+      "lines": "7320"
+    },
+    {
+      "what": "the New menu",
+      "path": "backend/internal/newdoc/newdoc.go",
+      "lines": "227-275"
+    },
+    {
+      "what": "setting: the ONLYOFFICE Document Server",
+      "path": "backend/internal/config/config.go",
+      "lines": "1630"
+    },
+    {
+      "what": "setting: the ONLYOFFICE secret",
+      "path": "backend/internal/config/config.go",
+      "lines": "1639"
+    },
+    {
+      "what": "setting: the draw.io server",
+      "path": "backend/internal/config/config.go",
+      "lines": "1645"
+    },
+    {
+      "what": "setting: 7-Zip",
+      "path": "backend/internal/config/config.go",
+      "lines": "1454"
+    },
+    {
+      "what": "the tools in filex's default image",
+      "path": "docker/Dockerfile",
+      "lines": "205-222"
+    }
+  ]
+}

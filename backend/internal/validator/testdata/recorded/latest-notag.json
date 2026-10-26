@@ -1,0 +1,10 @@
+{
+ "error": "fetch_failed",
+ "message": "filex-app.json not found in BRF-Tech/filex-sign: http 404 from raw.githubusercontent.com",
+ "reason": "manifest_not_found",
+ "refs": [
+  "v9.9.9"
+ ],
+ "status": 404,
+ "where": "BRF-Tech/filex-sign"
+}

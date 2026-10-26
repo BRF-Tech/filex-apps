@@ -1,0 +1,26 @@
+{
+  "manifest_version": 1,
+  "name": "lang-es",
+  "version": "0.1.8",
+  "label": {
+    "en": "Spanish language pack",
+    "es": "Paquete de idioma español"
+  },
+  "description": {
+    "en": "The whole filex interface in Spanish. AI-translated, awaiting review by a native speaker - corrections welcome.",
+    "es": "Toda la interfaz de filex en español. Traducción hecha por IA, pendiente de revisión por un hablante nativo; se agradecen las correcciones."
+  },
+  "languages": [
+    "en",
+    "es"
+  ],
+  "homepage": "https://github.com/BRF-Tech/filex-lang-es",
+  "permissions": [],
+  "ui_locales": {
+    "es": {
+      "about.auth": "Autenticación",
+      "about.build": "Compilación",
+      "about.db": "Base de datos"
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "manifest_version": 1,
+  "name": "filextext",
+  "version": "0.1.1",
+  "label": {
+    "en": "filextext",
+    "tr": "filextext"
+  },
+  "description": {
+    "en": "An end-to-end encrypted text workspace in a single .fxtxt file: pages and folders, edited with AFFiNE's BlockSuite editor. Encryption happens in your browser; filex only ever stores ciphertext.",
+    "tr": "Tek bir .fxtxt dosyasında uçtan uca şifreli bir metin çalışma alanı: sayfalar ve klasörler, AFFiNE'ın BlockSuite editörüyle düzenlenir. Şifreleme tarayıcınızda yapılır; filex yalnızca şifreli veriyi saklar."
+  },
+  "homepage": "https://github.com/BRF-Tech/filextext-app",
+  "filex": ">=0.48.0",
+  "permissions": [
+    "files:read",
+    "files:write"
+  ],
+  "permission_reasons": {
+    "files:read": {
+      "en": "To read the encrypted .fxtxt file you open with it. It is decrypted in your browser, never on the server.",
+      "tr": "Onunla açtığınız şifreli .fxtxt dosyasını okumak için. Dosya sunucuda değil, tarayıcınızda çözülür."
+    },
+    "files:write": {
+      "en": "To save the workspace back into that same file, encrypted again in your browser before it is sent.",
+      "tr": "Çalışma alanını aynı dosyaya geri kaydetmek için; gönderilmeden önce tarayıcınızda yeniden şifrelenir."
+    },
+    "ui": {
+      "en": "The editor and the encryption run in your browser, in filex's sandboxed frame. None of this app runs on the server.",
+      "tr": "Düzenleyici ve şifreleme tarayıcınızda, filex'in yalıtılmış çerçevesinde çalışır. Bu uygulamanın hiçbir parçası sunucuda çalışmaz."
+    },
+    "ui:download": {
+      "en": "Only for Download in a page's export dialog: when you click it, that page goes to your computer, in the clear.",
+      "tr": "Yalnızca bir sayfanın dışa aktarma penceresindeki İndir düğmesi için: tıkladığınızda o sayfa düz metin olarak bilgisayarınıza iner."
+    },
+    "ui-viewer:.fxtxt": {
+      "en": "A .fxtxt file is an encrypted workspace: filex's own preview cannot read it.",
+      "tr": "Bir .fxtxt dosyası şifreli bir çalışma alanıdır; filex'in kendi önizlemesi onu okuyamaz."
+    },
+    "ui-new:.fxtxt": {
+      "en": "So that New document can start a new encrypted workspace.",
+      "tr": "Yeni belge menüsünden yeni bir şifreli çalışma alanı başlatılabilsin diye."
+    }
+  },
+  "languages": [
+    "en",
+    "tr"
+  ],
+  "ui": {
+    "bundle": {
+      "url": "https://github.com/BRF-Tech/filextext-app/releases/download/{tag}/ui.zip",
+      "sha256": "21cafc370dec1e97340819b454324cda6fd3ba476292c22a8448f7c06934ddef"
+    },
+    "download": true
+  },
+  "views": [
+    {
+      "id": "editor",
+      "placement": "viewer",
+      "ui": "index.html",
+      "applies": {
+        "kind": "file",
+        "ext": [
+          "fxtxt"
+        ]
+      },
+      "label": {
+        "en": "filextext",
+        "tr": "filextext"
+      }
+    }
+  ],
+  "new_documents": [
+    {
+      "ext": "fxtxt",
+      "label": {
+        "en": "Encrypted workspace (.fxtxt)",
+        "tr": "Şifreli çalışma alanı (.fxtxt)"
+      },
+      "view": "editor"
+    }
+  ]
+}

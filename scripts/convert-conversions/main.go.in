@@ -1,0 +1,413 @@
+// Command fapps-conversions writes the `conversions` of filex-convert's
+// store listing (seed/official/filex-convert/listing.json) and its source
+// note (CONVERSIONS.md) from filex-convert's own planner, at one tag.
+//
+// It is not built in this repository: scripts/gen-convert-conversions.sh
+// copies it into a throw-away export of filex-convert at the tag
+// (tools/fapps-conversions/main.go) and runs it there, because the planner
+// lives in filex-convert's internal packages.
+//
+// What it claims, and why it is true: for every format the converter
+// detects (formats.All, by extension: formats.Detect) and every other format,
+// it asks the converter's own planner (graph.Route, the call the wizard makes
+// for its target list: view.analyse -> graph.Targets -> graph.Reachable ->
+// graph.Route) whether a route exists with a given set of filex engines
+// present. A pair is written once per minimal engine set that makes it work:
+// with no engine at all (pure Go inside the sandbox) it is written without
+// `needs`; otherwise once for each smallest set of engines (ONLYOFFICE,
+// ffmpeg, ...) that is enough, so "pdf -> png" is written twice, once
+// needing poppler and once needing ghostscript. A format converted to
+// itself (pdf compression, re-encoding) is not a conversion and is left
+// out.
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/brf-tech/filex-convert/internal/formats"
+	"github.com/brf-tech/filex-convert/internal/graph"
+)
+
+// conversion is one entry of the listing's `conversions`
+// (schema/filex-apps.schema.json).
+type conversion struct {
+	From  []string `json:"from"`
+	To    []string `json:"to"`
+	Needs []string `json:"needs,omitempty"`
+}
+
+// anchor is one place in filex-convert the claim rests on.
+type anchor struct {
+	What, Path, Needle string
+	Line               int
+}
+
+var anchors = []*anchor{
+	{What: "the formats the converter detects, by extension (catalogue order)", Path: "internal/formats/formats.go", Needle: "var All = []Format{"},
+	{What: "a file's format is read from its extension", Path: "internal/formats/formats.go", Needle: "func Detect(name string)"},
+	{What: "an output file's extension", Path: "internal/formats/formats.go", Needle: "func (f Format) Primary() string"},
+	{What: "the edge table (engine per step)", Path: "internal/graph/edges.go", Needle: "var edges = buildEdges()"},
+	{What: "the engines a step may need", Path: "internal/graph/graph.go", Needle: "var Engines = []string{"},
+	{What: "routes chain at most this many steps", Path: "internal/graph/graph.go", Needle: "const MaxSteps = "},
+	{What: "the planner the wizard and the job both call", Path: "internal/graph/graph.go", Needle: "func Route(from, to string, engines map[string]bool)"},
+	{What: "the wizard's target list for a selection", Path: "internal/view/view.go", Needle: "sel.targets = graph.Targets(sel.sources, sel.engines)"},
+}
+
+func main() {
+	tag := flag.String("tag", "", "the filex-convert tag this tree is")
+	commit := flag.String("commit", "", "the tag's commit")
+	listing := flag.String("listing", "", "the listing file to write `conversions` into")
+	notes := flag.String("notes", "", "the source note to write (CONVERSIONS.md)")
+	check := flag.Bool("check", false, "compare instead of writing; exit 1 on a difference")
+	flag.Parse()
+	if *tag == "" || *commit == "" || *listing == "" || *notes == "" {
+		fmt.Fprintln(os.Stderr, "usage: fapps-conversions -tag <tag> -commit <sha> -listing <listing.json> -notes <CONVERSIONS.md> [-check]")
+		os.Exit(2)
+	}
+	for _, a := range anchors {
+		if err := a.find(); err != nil {
+			fmt.Fprintln(os.Stderr, "fapps-conversions:", err)
+			os.Exit(1)
+		}
+	}
+	convs, pairs := build()
+
+	oldListing, err := os.ReadFile(*listing)
+	if err != nil {
+		fail(err)
+	}
+	newListing, err := withConversions(oldListing, convs)
+	if err != nil {
+		fail(fmt.Errorf("%s: %w", *listing, err))
+	}
+	note := sourceNote(*tag, *commit, convs, pairs)
+	oldNote, _ := os.ReadFile(*notes)
+
+	if *check {
+		bad := false
+		if !bytes.Equal(oldListing, newListing) {
+			fmt.Fprintf(os.Stderr, "%s: `conversions` differs from what filex-convert %s says\n", *listing, *tag)
+			bad = true
+		}
+		if !bytes.Equal(oldNote, note) {
+			fmt.Fprintf(os.Stderr, "%s differs from what filex-convert %s says\n", *notes, *tag)
+			bad = true
+		}
+		if bad {
+			fmt.Fprintln(os.Stderr, "run without --check to write them")
+			os.Exit(1)
+		}
+		fmt.Printf("ok: %d entries, %d pairs, filex-convert %s\n", len(convs), len(pairs), *tag)
+		return
+	}
+	if err := os.WriteFile(*listing, newListing, 0o644); err != nil {
+		fail(err)
+	}
+	if err := os.WriteFile(*notes, note, 0o644); err != nil {
+		fail(err)
+	}
+	fmt.Printf("wrote %d entries (%d pairs) from filex-convert %s\n", len(convs), len(pairs), *tag)
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, "fapps-conversions:", err)
+	os.Exit(1)
+}
+
+func (a *anchor) find() error {
+	b, err := os.ReadFile(filepath.FromSlash(a.Path))
+	if err != nil {
+		return err
+	}
+	i := bytes.Index(b, []byte(a.Needle))
+	if i < 0 {
+		return fmt.Errorf("%s: %q not found (%s); read the code at this tag and update the generator", a.Path, a.Needle, a.What)
+	}
+	a.Line = bytes.Count(b[:i], []byte("\n")) + 1
+	return nil
+}
+
+// pair is one source format, one target format and one minimal engine set.
+type pair struct {
+	from, to string
+	needs    []string
+}
+
+// minimalSets answers every smallest set of engines with which the planner
+// finds a route from -> to (the empty set when pure Go is enough), smallest
+// first, each set in graph.Engines order. Engines only add edges, so a set
+// that works keeps working with more: a set is minimal when no smaller set
+// found before it is inside it.
+func minimalSets(from, to string) [][]string {
+	n := len(graph.Engines)
+	var masks []int
+	for m := 0; m < 1<<n; m++ {
+		masks = append(masks, m)
+	}
+	sort.SliceStable(masks, func(i, j int) bool { return bits(masks[i]) < bits(masks[j]) })
+	var found []int
+	for _, m := range masks {
+		inside := false
+		for _, f := range found {
+			if f&m == f {
+				inside = true
+				break
+			}
+		}
+		if inside {
+			continue
+		}
+		have := map[string]bool{}
+		for i, e := range graph.Engines {
+			if m&(1<<i) != 0 {
+				have[e] = true
+			}
+		}
+		if _, err := graph.Route(from, to, have); err == nil {
+			found = append(found, m)
+		}
+	}
+	out := [][]string{}
+	for _, m := range found {
+		set := []string{}
+		for i, e := range graph.Engines {
+			if m&(1<<i) != 0 {
+				set = append(set, e)
+			}
+		}
+		out = append(out, set)
+	}
+	return out
+}
+
+func bits(m int) int {
+	c := 0
+	for ; m != 0; m &= m - 1 {
+		c++
+	}
+	return c
+}
+
+// build is the listing's `conversions`: per engine set, the sources that
+// reach the same targets are one entry (every extension of each source,
+// the targets' output extensions), in catalogue order.
+func build() ([]conversion, []pair) {
+	var pairs []pair
+	for _, f := range formats.All {
+		for _, t := range formats.All {
+			if f.ID == t.ID {
+				continue
+			}
+			for _, set := range minimalSets(f.ID, t.ID) {
+				pairs = append(pairs, pair{from: f.ID, to: t.ID, needs: set})
+			}
+		}
+	}
+	// targets[needs][source] = targets in catalogue order
+	type key struct{ needs, from string }
+	targets := map[key][]string{}
+	var needsOrder []string
+	seenNeeds := map[string]bool{}
+	for _, p := range pairs {
+		nk := strings.Join(p.needs, "+")
+		if !seenNeeds[nk] {
+			seenNeeds[nk] = true
+			needsOrder = append(needsOrder, nk)
+		}
+		k := key{nk, p.from}
+		targets[k] = append(targets[k], p.to)
+	}
+	sort.SliceStable(needsOrder, func(i, j int) bool { return needsLess(needsOrder[i], needsOrder[j]) })
+	var out []conversion
+	for _, nk := range needsOrder {
+		groupOf := map[string]int{}
+		for _, f := range formats.All {
+			ts, ok := targets[key{nk, f.ID}]
+			if !ok {
+				continue
+			}
+			to := make([]string, 0, len(ts))
+			for _, id := range ts {
+				tf, _ := formats.ByID(id)
+				to = append(to, tf.Primary())
+			}
+			sig := strings.Join(to, ",")
+			if i, ok := groupOf[sig]; ok {
+				out[i].From = append(out[i].From, f.Ext...)
+				continue
+			}
+			c := conversion{From: append([]string{}, f.Ext...), To: to}
+			if nk != "" {
+				c.Needs = strings.Split(nk, "+")
+			}
+			groupOf[sig] = len(out)
+			out = append(out, c)
+		}
+	}
+	return out, pairs
+}
+
+// needsLess orders engine sets ("" first, then by size, then by the first
+// engine's place in graph.Engines); a set is its engines joined by "+".
+func needsLess(a, b string) bool {
+	if (a == "") != (b == "") {
+		return a == ""
+	}
+	ca, cb := strings.Count(a, "+"), strings.Count(b, "+")
+	if ca != cb {
+		return ca < cb
+	}
+	return engineRank(a) < engineRank(b)
+}
+
+// engineRank orders engine sets by the first engine's place in graph.Engines.
+func engineRank(set string) int {
+	first := strings.Split(set, "+")[0]
+	for i, e := range graph.Engines {
+		if e == first {
+			return i*100 + len(set)
+		}
+	}
+	return 1 << 20
+}
+
+// withConversions is the listing with `conversions` replaced (appended when
+// absent); every other member keeps its bytes, re-indented the same way.
+func withConversions(b []byte, convs []conversion) ([]byte, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return nil, errors.New("not a JSON object")
+	}
+	type member struct {
+		key string
+		raw json.RawMessage
+	}
+	var members []member
+	for dec.More() {
+		kt, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return nil, err
+		}
+		members = append(members, member{kt.(string), raw})
+	}
+	var c bytes.Buffer
+	c.WriteString("[\n")
+	for i, cv := range convs {
+		line, err := json.Marshal(cv)
+		if err != nil {
+			return nil, err
+		}
+		line = bytes.ReplaceAll(line, []byte(`","`), []byte(`", "`))
+		line = bytes.ReplaceAll(line, []byte(`],"`), []byte(`], "`))
+		line = bytes.ReplaceAll(line, []byte(`":`), []byte(`": `))
+		c.WriteString("    ")
+		c.Write(line)
+		if i < len(convs)-1 {
+			c.WriteString(",")
+		}
+		c.WriteString("\n")
+	}
+	c.WriteString("  ]")
+	replaced := false
+	for i := range members {
+		if members[i].key == "conversions" {
+			members[i].raw = c.Bytes()
+			replaced = true
+		}
+	}
+	if !replaced {
+		members = append(members, member{"conversions", c.Bytes()})
+	}
+	var out bytes.Buffer
+	out.WriteString("{\n")
+	for i, m := range members {
+		k, _ := json.Marshal(m.key)
+		out.WriteString("  ")
+		out.Write(k)
+		out.WriteString(": ")
+		if m.key == "conversions" {
+			out.Write(m.raw)
+		} else {
+			var ind bytes.Buffer
+			if err := json.Indent(&ind, m.raw, "  ", "  "); err != nil {
+				return nil, err
+			}
+			out.Write(ind.Bytes())
+		}
+		if i < len(members)-1 {
+			out.WriteString(",")
+		}
+		out.WriteString("\n")
+	}
+	out.WriteString("}\n")
+	return out.Bytes(), nil
+}
+
+// sourceNote is CONVERSIONS.md: where the listing's `conversions` come
+// from, and the same data per source format for a reviewer.
+func sourceNote(tag, commit string, convs []conversion, pairs []pair) []byte {
+	var w bytes.Buffer
+	p := func(f string, a ...any) { fmt.Fprintf(&w, f, a...) }
+	p("# filex-convert: the conversions its store listing declares\n\n")
+	p("Generated by `scripts/gen-convert-conversions.sh` from filex-convert **%s** (commit `%s`); do not edit by hand.\n", tag, commit)
+	p("`listing.json`'s `conversions` (%d entries, %d source-target-condition pairs) is written by the same run.\n\n", len(convs), len(pairs))
+	p("How it is measured: for every format the converter detects and every other format, the converter's own planner\n")
+	p("(`graph.Route`, the call its wizard makes for the target list) is asked whether a route exists with a given set\n")
+	p("of filex engines present. A pair is declared with no `needs` when it works with no engine at all (pure Go in the\n")
+	p("sandbox), else once per smallest set of engines that is enough (`pdf -> png` needs poppler, or ghostscript).\n")
+	p("A format converted to itself (PDF compression, re-encoding) is not declared. Routes chain at most %d steps,\n", graph.MaxSteps)
+	p("so `docx -> pdf` is declared without `needs`: with nothing connected it goes through the sandbox's own Word\n")
+	p("reader and PDF writer (text and tables); with ONLYOFFICE connected the planner prefers it for the layout.\n")
+	p("The archive targets (zip, tar, tar.gz, tar.zst, tar.xz) of a non-archive format are the converter's \"pack this\n")
+	p("file into an archive\" step. `needs` lists engine ids as filex names them (the manifest's `engines:<id>`\n")
+	p("permissions): office is the ONLYOFFICE Document Server connected to filex, the others are programs on the\n")
+	p("filex server.\n\n")
+	p("## Sources (filex-convert %s)\n\n", tag)
+	p("| What | Where |\n|---|---|\n")
+	for _, a := range anchors {
+		p("| %s | `%s:%d` |\n", a.What, a.Path, a.Line)
+	}
+	p("\n## Per source format\n\n")
+	p("`-` means pure Go inside the sandbox (nothing else needed); engine names are filex's (`engines:<id>` permissions).\n\n")
+	p("| From | To | Needs |\n|---|---|---|\n")
+	for _, f := range formats.All {
+		byNeeds := map[string][]string{}
+		var order []string
+		for _, pr := range pairs {
+			if pr.from != f.ID {
+				continue
+			}
+			nk := strings.Join(pr.needs, "+")
+			if _, ok := byNeeds[nk]; !ok {
+				order = append(order, nk)
+			}
+			tf, _ := formats.ByID(pr.to)
+			byNeeds[nk] = append(byNeeds[nk], tf.Primary())
+		}
+		sort.SliceStable(order, func(i, j int) bool { return needsLess(order[i], order[j]) })
+		for _, nk := range order {
+			needs := strings.ReplaceAll(nk, "+", " + ")
+			if needs == "" {
+				needs = "-"
+			}
+			p("| %s | %s | %s |\n", strings.Join(f.Ext, ", "), strings.Join(byNeeds[nk], ", "), needs)
+		}
+	}
+	return w.Bytes()
+}

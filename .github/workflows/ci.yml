@@ -1,0 +1,72 @@
+# The checks of every push and pull request: the same scripts the pre-push
+# hook runs (scripts/checks/go.sh, scripts/checks/web.sh), gitleaks over the
+# tree, and the backend's integration tests against PostgreSQL 16 and Redis 7
+# (scripts/integration.sh). The end-to-end stack is heavier and runs by hand:
+# e2e.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go (gofmt, vet, build, test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: golang:1.25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: scripts/checks/go.sh
+        working-directory: backend
+        env:
+          GOFLAGS: -buildvcs=false
+        run: bash ../scripts/checks/go.sh
+
+  web:
+    name: Web (gen:api, build, unit tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: node:22-bookworm-slim
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: scripts/checks/web.sh
+        working-directory: web
+        run: bash ../scripts/checks/web.sh
+
+  integration:
+    name: Integration (PostgreSQL 16, Redis 7)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: scripts/integration.sh
+        run: bash scripts/integration.sh
+
+  gitleaks:
+    name: gitleaks (the tree)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: gitleaks dir
+        run: >-
+          docker run --rm -v "$PWD:/repo:ro" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0
+          dir --no-banner --redact --verbose --exit-code 1 --config /repo/.githooks/gitleaks.toml /repo

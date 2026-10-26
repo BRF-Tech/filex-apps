@@ -1,0 +1,15 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["documents", "security"],
+  "summary": {
+    "en": "Sign PDFs yourself or ask others to sign, inside filex: named boxes on the page, a step-by-step screen for both sides, a receipt for every signer and a Verify report on any PDF."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/request-place.png", "caption": {"en": "Requesting signatures: each named box is placed on the page"}},
+    {"path": "screenshots/request-boxes.png", "caption": {"en": "The boxes to fill in: who signs, how, and what is printed under the signature"}},
+    {"path": "screenshots/signer-fill.png", "caption": {"en": "An outside signer fills in the named boxes on a time-limited page"}},
+    {"path": "screenshots/status.png", "caption": {"en": "The file is held while signatures are collected; the details panel follows every signer"}}
+  ]
+}

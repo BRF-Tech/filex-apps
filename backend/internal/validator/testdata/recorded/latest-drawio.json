@@ -1,0 +1,139 @@
+{
+ "compat": {
+  "filex": "0.50.0",
+  "ok": true,
+  "requires": ">=0.48.0"
+ },
+ "engine": false,
+ "file_types": [
+  {
+   "capability": "open",
+   "current": [
+    {
+     "id": "builtin"
+    }
+   ],
+   "default": "first",
+   "ext": "dio",
+   "handler": {
+    "app": "drawio",
+    "id": "app:drawio/editor",
+    "label": {
+     "en": "draw.io",
+     "tr": "draw.io"
+    },
+    "version": "31.5.3",
+    "view": "editor"
+   },
+   "mime": "application/vnd.jgraph.mxfile"
+  },
+  {
+   "capability": "open",
+   "current": [
+    {
+     "id": "builtin"
+    }
+   ],
+   "default": "first",
+   "ext": "drawio",
+   "handler": {
+    "app": "drawio",
+    "id": "app:drawio/editor",
+    "label": {
+     "en": "draw.io",
+     "tr": "draw.io"
+    },
+    "version": "31.5.3",
+    "view": "editor"
+   },
+   "mime": "application/vnd.jgraph.mxfile"
+  }
+ ],
+ "kind": "app",
+ "manifest": {
+  "_trimmed": "recorded answer; the manifest is cut to the fields the store reads",
+  "filex": ">=0.48.0",
+  "manifest_version": 1,
+  "name": "drawio",
+  "permissions": [
+   "files:read",
+   "files:write"
+  ],
+  "ui": {
+   "bundle": {
+    "sha256": "2ec43b1f0e2a31f24e7bf26900e177dd5591f0e06ad118875ffdf16885012c83",
+    "url": "https://github.com/BRF-Tech/filex-drawio/releases/download/v31.5.3/ui.zip"
+   },
+   "package_fetch": true
+  },
+  "version": "31.5.3"
+ },
+ "manifest_sha256": "4cced6df431dd2152b8c3091c1cc2d2ef7c1f805cdf8cca4f62698b04727cdaa",
+ "permissions": [
+  {
+   "id": "files:read",
+   "label": "Reads the contents of the files it is opened or run on, and of the files it keeps records about",
+   "reason": {
+    "en": "To open the diagram you open with it.",
+    "tr": "Onunla açtığınız diyagramı açmak için."
+   }
+  },
+  {
+   "id": "files:write",
+   "label": "Writes files next to the one it is run on, into a folder you choose, or as that file's new version",
+   "reason": {
+    "en": "To save the diagram back as a new version.",
+    "tr": "Diyagramı yeni sürüm olarak geri kaydetmek için."
+   }
+  },
+  {
+   "id": "ui",
+   "label": "Runs its own interface in your browser, in a sandbox filex controls",
+   "reason": {
+    "en": "draw.io is this app: it runs in your browser, in the sandbox filex draws for it.",
+    "tr": "Bu uygulama draw.io'nun kendisi: filex'in onun için çizdiği yalıtım alanında, tarayıcınızda çalışır."
+   }
+  },
+  {
+   "id": "ui:package-fetch",
+   "label": "Its interface reads its own package - the files of this version, nothing else",
+   "reason": {
+    "en": "draw.io loads its own translations, shapes and templates from its package while it runs.",
+    "tr": "draw.io çalışırken kendi çevirilerini, şekillerini ve şablonlarını paketinden yükler."
+   }
+  },
+  {
+   "id": "ui-viewer:.drawio",
+   "label": "Opens .drawio files in its own interface, in place of filex's preview",
+   "reason": {
+    "en": "So a .drawio diagram opens in draw.io.",
+    "tr": "Bir .drawio diyagramı draw.io'da açılsın diye."
+   }
+  },
+  {
+   "id": "ui-viewer:.dio",
+   "label": "Opens .dio files in its own interface, in place of filex's preview",
+   "reason": {
+    "en": "So a .dio diagram opens in draw.io.",
+    "tr": "Bir .dio diyagramı draw.io'da açılsın diye."
+   }
+  },
+  {
+   "id": "ui-new:.drawio",
+   "label": "Adds a new .drawio file to the New menu; it opens in this app's interface",
+   "reason": {
+    "en": "So you can start a new diagram from New document.",
+    "tr": "Yeni belge'den yeni bir diyagram başlatabilesiniz diye."
+   }
+  }
+ ],
+ "signed": false,
+ "ui": {
+  "bytes": 49508646,
+  "files": 3384,
+  "sha256": "2ec43b1f0e2a31f24e7bf26900e177dd5591f0e06ad118875ffdf16885012c83",
+  "unpacked": 150047123
+ },
+ "wasm_bytes": 0,
+ "wasm_sha256": ""
+}

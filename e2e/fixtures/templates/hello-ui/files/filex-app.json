@@ -1,0 +1,36 @@
+{
+  "manifest_version": 1,
+  "name": "${NAME}",
+  "version": "${VERSION}",
+  "filex": ">=0.49.0",
+  "label": {
+    "en": "E2E Hello (${VARIANT})"
+  },
+  "description": {
+    "en": "An interface-only app the store's end-to-end tests publish. It opens .e2etxt files, and .drawio and .docx too, so the store's file-type search has an app to find."
+  },
+  "homepage": "https://github.com/${OWNER}/${REPO}",
+  "permissions": ["files:read"],
+  "permission_reasons": {
+    "files:read": { "en": "To show the file you open with it." },
+    "ui": { "en": "The viewer is this app's own page, run in the sandbox filex draws for it." },
+    "ui-viewer:.e2etxt": { "en": "So an .e2etxt file opens in this viewer." },
+    "ui-viewer:.drawio": { "en": "So a .drawio file opens in this viewer." },
+    "ui-viewer:.docx": { "en": "So a .docx file opens in this viewer." }
+  },
+  "ui": {
+    "bundle": {
+      "url": "https://github.com/${OWNER}/${REPO}/releases/download/{tag}/ui.zip",
+      "sha256": "${ASSET_SHA256:ui.zip}"
+    }
+  },
+  "views": [
+    {
+      "id": "viewer",
+      "placement": "viewer",
+      "ui": "index.html",
+      "label": { "en": "E2E Hello" },
+      "applies": { "ext": ["e2etxt", "drawio", "docx"] }
+    }
+  ]
+}

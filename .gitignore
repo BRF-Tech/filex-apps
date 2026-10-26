@@ -1,0 +1,39 @@
+# secrets and local env
+.env
+.env.*
+!.env.example
+
+# web
+web/node_modules/
+web/dist/
+node_modules/
+
+# go
+backend/bin/
+*.test
+*.out
+coverage.*
+
+# the SPA is copied here at image build time; only the placeholder is tracked
+backend/internal/webui/dist/*
+!backend/internal/webui/dist/.gitkeep
+
+# e2e
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# agent worktrees live inside the repository
+.claude/worktrees/
+
+# build and test logs
+*.log
+
+# agent worktrees (git worktree add .claude/worktrees/<name>)
+.claude/

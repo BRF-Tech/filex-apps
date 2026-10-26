@@ -1,0 +1,27 @@
+{
+ "engine": false,
+ "kind": "language_pack",
+ "languages": [
+  {
+   "code": "es",
+   "keys": 5317,
+   "percent": 99,
+   "rtl": false,
+   "total": 4501,
+   "translated": 4496,
+   "unknown": 817
+  }
+ ],
+ "manifest": {
+  "_trimmed": "recorded answer; the manifest is cut to the fields the store reads",
+  "manifest_version": 1,
+  "name": "lang-es",
+  "permissions": [],
+  "version": "0.1.7"
+ },
+ "manifest_sha256": "570ae0bb3b0bedcd81269694be3c56ffa0d44a3f65c0b8ae87a7e61218c14abd",
+ "permissions": [],
+ "signed": false,
+ "wasm_bytes": 0,
+ "wasm_sha256": ""
+}

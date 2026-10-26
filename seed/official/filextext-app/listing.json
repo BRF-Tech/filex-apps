@@ -1,0 +1,15 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["documents", "productivity", "security"],
+  "summary": {
+    "en": "An end-to-end encrypted text workspace in a single .fxtxt file: pages, folders and tabs, edited with AFFiNE's BlockSuite editor. filex only ever stores ciphertext."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/workspace.png", "caption": {"en": "A workspace: the page tree, two tabs and a page"}},
+    {"path": "screenshots/create.png", "caption": {"en": "Creating an encrypted workspace with a password"}},
+    {"path": "screenshots/unlock.png", "caption": {"en": "Opening it again: the password never leaves the browser"}},
+    {"path": "screenshots/export.png", "caption": {"en": "Exporting a page as Markdown"}}
+  ]
+}

@@ -1,0 +1,47 @@
+package plugin
+
+// Copied next to filex's own backend/internal/plugin/signature.go by run.sh:
+// the store's signature vectors must verify with filex's VerifyDetached,
+// unchanged. Not part of the store's Go module (the .in suffix keeps it out).
+
+import (
+	"encoding/json"
+	"errors"
+	"os"
+	"testing"
+)
+
+func TestStoreVectorsVerifyWithFilexVerifyDetached(t *testing.T) {
+	b, err := os.ReadFile("vectors.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Vectors []map[string]string `json:"vectors"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Vectors) == 0 {
+		t.Fatal("no vectors")
+	}
+	for _, v := range doc.Vectors {
+		keys, err := ParsePublicKeys([]string{v["public_hex"]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := VerifyDetached(keys, v["sha256_hex"], v["signature_hex"]); err != nil {
+			t.Fatalf("%s: filex VerifyDetached refused the store's signature: %v", v["name"], err)
+		}
+		bad := []byte(v["sha256_hex"])
+		if bad[0] == 'a' {
+			bad[0] = 'b'
+		} else {
+			bad[0] = 'a'
+		}
+		if err := VerifyDetached(keys, string(bad), v["signature_hex"]); !errors.Is(err, ErrSignatureInvalid) {
+			t.Fatalf("%s: a changed digest was not refused: %v", v["name"], err)
+		}
+		t.Logf("%s: verified by filex VerifyDetached", v["name"])
+	}
+}

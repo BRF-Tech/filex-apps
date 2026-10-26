@@ -1,0 +1,15 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["fun", "media"],
+  "summary": {
+    "en": "Plays DOOM-engine WAD files and DOS games packed for js-dos inside filex."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/playing.png", "caption": {"en": "Freedoom: Phase 2 playing in place of the preview"}},
+    {"path": "screenshots/start.png", "caption": {"en": "A WAD opened from the explorer, ready to start"}},
+    {"path": "screenshots/keep-saves.png", "caption": {"en": "Keeping saved games in a .fxdoom pack"}},
+    {"path": "screenshots/dos-start.png", "caption": {"en": "The DOS player with a js-dos bundle"}}
+  ]
+}

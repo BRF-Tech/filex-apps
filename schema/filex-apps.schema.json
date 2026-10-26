@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BRF-Tech/filex-apps/main/schema/filex-apps.schema.json",
+  "title": ".filex-apps.json",
+  "description": "The file a repository carries at its root, next to filex-app.json, to be listed in the filex Apps store. Read at the submitted tag's commit: it is the repository owner's consent to the listing under the named publisher, and the listing's own metadata, reviewed together with the code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["publisher"],
+  "properties": {
+    "publisher": {
+      "description": "The store publisher id this repository is listed under. Must be the publisher the submitter acts for, and that publisher must be bound to this repository's GitHub owner.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$"
+    },
+    "categories": {
+      "description": "Store category ids (GET /api/v1/categories). Language packs need none.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" },
+      "maxItems": 3,
+      "uniqueItems": true
+    },
+    "summary": {
+      "description": "One sentence for the catalog card, per language. English is required when present.",
+      "$ref": "#/$defs/text",
+      "required": ["en"]
+    },
+    "description": {
+      "description": "Path of a Markdown file in the repository shown on the app's page (rendered through a sanitizer; no HTML that runs). Defaults to none.",
+      "$ref": "#/$defs/path"
+    },
+    "icon": {
+      "description": "Path of a square PNG or WebP icon in the repository, 128 to 1024 px. Without one the store draws the manifest's icon name.",
+      "$ref": "#/$defs/path"
+    },
+    "screenshots": {
+      "description": "Up to 8 screenshots (PNG, JPEG or WebP), shown in this order. The store mirrors them by sha256; it never links to GitHub.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path" },
+          "caption": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "conversions": {
+      "description": "Which kinds of file the app converts into which, reviewed with the code and searched by the store's file-type search (a search for .docx finds an app whose `from` names docx). Each entry says: a file of every `from` extension converts into every `to` extension, needing every engine of `needs` on the filex it runs in; without `needs` it needs nothing else. A pair that works with any one of several engines is written once per engine. Every engine in `needs` must be one the manifest asks for (an `engines:<id>` permission; `office` is the ONLYOFFICE Document Server connected to filex). Declare what the app really offers, never more: a reviewer compares it with the code. At most 16384 from-to pairs in all.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "description": "Extensions converted from; none of them in `to`.", "$ref": "#/$defs/exts" },
+          "to": { "description": "Extensions converted into (the output file's extension).", "$ref": "#/$defs/exts" },
+          "needs": {
+            "description": "Engines the conversion needs, all of them; absent: none.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "exts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_+-]{0,31}(\\.[a-z0-9][a-z0-9_+-]{0,31}){0,2}$" }
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+    },
+    "text": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 300 }
+    }
+  }
+}

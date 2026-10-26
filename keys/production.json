@@ -1,0 +1,28 @@
+{
+  "store": "https://apps.filex.sh",
+  "generated": "2026-10-05",
+  "fingerprint": "lower-hex sha256 of the 32 raw ed25519 public key bytes (what filex shows when it asks to trust a store)",
+  "keys": [
+    {
+      "id": "index-2026-10",
+      "use": "index",
+      "status": "active",
+      "ed25519": "df18ded0d71e46e2d53cd479526744ebb9c3ddadb854a32879448fa64453636c",
+      "sha256": "205cd1302b9a5025776636b189b6ef80c5a72f4128acb802b917434380bc4c88"
+    },
+    {
+      "id": "artifact-2026-10",
+      "use": "artifact",
+      "status": "active",
+      "ed25519": "3dda5d791aeae607cd92cbef9b2a7d635b7a99bbb2f6cea040557527f72f797c",
+      "sha256": "94974dbae4cc3106406cbf812a4f33b530030ac244b57b73a8989bb23d4df62e"
+    },
+    {
+      "id": "license-2026-10",
+      "use": "license",
+      "status": "active",
+      "ed25519": "7cde525fd0e80e14b7d116e02aa4deb10067c711d9d8021147995d402bdb28e1",
+      "sha256": "2807b0749a94944285c293ee82ae46600877925a0815cbc0484a93789e0371b4"
+    }
+  ]
+}

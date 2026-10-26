@@ -1,0 +1,24 @@
+{
+  "manifest_version": 1,
+  "name": "${NAME}",
+  "version": "${VERSION}",
+  "filex": ">=0.49.0",
+  "label": {
+    "en": "E2E language pack (${VARIANT})",
+    "es": "Paquete de idioma E2E"
+  },
+  "description": {
+    "en": "A language pack the store's end-to-end tests publish.",
+    "es": "Un paquete de idioma que publican las pruebas de extremo a extremo de la tienda."
+  },
+  "languages": ["en", "es"],
+  "homepage": "https://github.com/${OWNER}/${REPO}",
+  "permissions": [],
+  "ui_locales": {
+    "es": {
+      "about.auth": "Autenticación",
+      "about.build": "Compilación",
+      "about.db": "Base de datos"
+    }
+  }
+}

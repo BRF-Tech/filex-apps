@@ -1,0 +1,24 @@
+{
+  "node_id": "TA_kwDOUqAOOtoAKGFhODVkZDZhMDEzOWU0NTgxN2NjOTVlYTNkOGJlYjVhZmU5NWZjN2U",
+  "sha": "aa85dd6a0139e45817cc95ea3d8beb5afe95fc7e",
+  "url": "https://api.github.com/repos/BRF-Tech/filex-sign/git/tags/aa85dd6a0139e45817cc95ea3d8beb5afe95fc7e",
+  "tagger": {
+    "name": "Burak Faruk Şahin",
+    "email": "brkfun@users.noreply.github.com",
+    "date": "2026-10-03T02:05:51Z"
+  },
+  "object": {
+    "sha": "ac3fa19e20be574cde1a154dbfbe01f59c55d2d1",
+    "type": "commit",
+    "url": "https://api.github.com/repos/BRF-Tech/filex-sign/git/commits/ac3fa19e20be574cde1a154dbfbe01f59c55d2d1"
+  },
+  "tag": "v0.3.0",
+  "message": "v0.3.0\n-----BEGIN PGP SIGNATURE-----\n\niHUEABYKAB0WIQTvo7EmL9mSgA27teOo/rqX/3hlEwUCasBi/wAKCRCo/rqX/3hl\nE/vLAQCxsjgmOoFxr9P7iV7ipcwGpAHbRRvWbrgRn6TmHehVJQD/TsnSl865+13n\nX+aiIKwyfzPySumy2EjP6uv/OOsvlAs=\n=XlQw\n-----END PGP SIGNATURE-----\n",
+  "verification": {
+    "verified": true,
+    "reason": "valid",
+    "signature": "-----BEGIN PGP SIGNATURE-----\n\niHUEABYKAB0WIQTvo7EmL9mSgA27teOo/rqX/3hlEwUCasBi/wAKCRCo/rqX/3hl\nE/vLAQCxsjgmOoFxr9P7iV7ipcwGpAHbRRvWbrgRn6TmHehVJQD/TsnSl865+13n\nX+aiIKwyfzPySumy2EjP6uv/OOsvlAs=\n=XlQw\n-----END PGP SIGNATURE-----\n",
+    "payload": "object ac3fa19e20be574cde1a154dbfbe01f59c55d2d1\ntype commit\ntag v0.3.0\ntagger Burak Faruk Şahin <brkfun@users.noreply.github.com> 1790993151 +0300\n\nv0.3.0\n",
+    "verified_at": "2026-10-03T03:11:04Z"
+  }
+}

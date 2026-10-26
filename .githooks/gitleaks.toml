@@ -1,0 +1,34 @@
+# gitleaks configuration for .githooks/pre-push (gitleaks v8).
+# The default rules, plus the few files that hold throw-away test material
+# by design. Every entry says why; nothing real belongs on this list.
+title = "filex-apps"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Signature test vectors: throw-away ed25519 seeds published with the vectors so anyone can reproduce them"
+paths = [
+  '''^backend/internal/signing/testdata/vectors\.json$''',
+]
+
+[[allowlists]]
+description = """The licensing tests' public test values, by exact value (no file is exempt):
+the docs' made-up example license key, the RFC 8032 test seed (the envelope vectors'
+key, the config test's FAPPS_LICENSE_KEY), the vectors' made-up install token id and
+FAPPS_DATA_KEY as the bytes 0..31 in base64. Any other key in any file is still a finding."""
+regexes = [
+  '''^FXL-7K2Q-9WXM-3HDF-0PZA-QRST-V8MN-4C$''',
+  '''^9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60$''',
+  '''^0123456789abcdef$''',
+  '''^AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=?$''',
+]
+
+[[allowlists]]
+description = """The instance request signature vector (backend/internal/install/testdata/
+request-vector.json, made by make-request-vector.mjs), by exact value: the sha256 fingerprint
+of the public half of the throw-away seed 07 x 32 published in the same file. A fingerprint is
+public by design (filex shows it to the administrator). Any other key in any file is still a finding."""
+regexes = [
+  '''^fe812c12f3ab4ce6ac5db69ac352f906cb1b11ef43fb33e252ef7ff552263889$''',
+]

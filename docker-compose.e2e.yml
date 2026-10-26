@@ -1,0 +1,277 @@
+# End-to-end stack = the base stack (docker-compose.yml) + this overlay.
+#
+#   docker compose -p side-apps-e2e -f docker-compose.yml -f docker-compose.e2e.yml \
+#     --env-file .env.example --env-file e2e/stack.env --env-file <run secrets> ...
+#
+# scripts/e2e.sh does exactly that: it writes a fresh secrets file for the
+# run (session key, data key, the GitHub client secret, the
+# admin-repository token's stand-in, the database passwords), builds,
+# `up --wait`, runs Playwright, keeps the logs, then `down -v`. Nothing here
+# is deployed anywhere.
+#
+# What the overlay adds, and why:
+# - demo-postgres, demo-redis: a shared database server and Redis as a
+#   hosting platform runs them (one role per app with the narrow grants of
+#   e2e/postgres-init, not a superuser), on tmpfs: nothing survives a run.
+#   The images default to the public ones and can be pointed at a mirror
+#   (E2E_POSTGRES_IMAGE, E2E_REDIS_IMAGE).
+# - the app gets .env.example + the platform-style variables and the mocks'
+#   settings (e2e/stack.env) as env files, the secrets as environment, and
+#   its own logo (e2e/fixtures/brand, FAPPS_STORE_LOGO).
+# - mock-idp: GitHub's sign-in (OAuth), test-only, at https://mock-idp:9443
+#   (the browsers and the store both reach it there). It makes the run's
+#   throw-away CA (volume e2e-ca) before it reports healthy. GitHub access
+#   tokens are HMAC-signed with the run's MOCK_TOKEN_KEY, so the token
+#   mock-idp issues is accepted by the app's api.github.com sidecar; the
+#   server's admin-repository token (FAPPS_ADMIN_TOKEN) is handed to the
+#   mock and that sidecar as MOCK_GITHUB_ADMIN_TOKEN, and only it sees the
+#   private administration repository.
+# - edge: the store's HTTPS front door at https://fapps.e2e.test, standing in
+#   for the reverse proxy in front of a store (TLS ends there, X-Forwarded-*
+#   set).
+# - gh-latest, gh-floor, gh-app: GitHub's own host names on 127.0.0.1:443
+#   inside the validators' and the app's network namespaces. filex's GitHub
+#   install reads https://raw.githubusercontent.com and cannot be pointed
+#   elsewhere; extra_hosts sends those names to the sidecar, SSL_CERT_FILE
+#   trusts the throw-away CA, FILEX_PLUGIN_LOOPBACK_SOURCES=1 lets filex reach
+#   127.0.0.1 (test validators only). The store reaches the same names
+#   (api.github.com included) through gh-app, over HTTPS, with
+#   FAPPS_FETCH_ALLOW_PRIVATE=1 and FAPPS_FETCH_CA_FILE (APP_ENV=development
+#   only; e2e/stack.env): its outbound rules stay HTTPS-only.
+# - playwright: the test runner (profile "run": `compose run playwright`).
+#
+# One network (the project's default), no published port, two named volumes
+# (e2e-ca here, plugin-spool from docker-compose.yml: the plugin validator
+# has no network and meets the store only there).
+x-github-hosts: &github-hosts
+  - "github.com:127.0.0.1"
+  - "api.github.com:127.0.0.1"
+  - "raw.githubusercontent.com:127.0.0.1"
+  - "objects.githubusercontent.com:127.0.0.1"
+  - "release-assets.githubusercontent.com:127.0.0.1"
+  - "github-releases.githubusercontent.com:127.0.0.1"
+  - "codeload.github.com:127.0.0.1"
+
+x-validator-e2e: &validator-e2e
+  environment:
+    FILEX_ADMIN_EMAIL: ${FAPPS_VALIDATOR_EMAIL:-validator@local}
+    FILEX_ADMIN_PASSWORD: ${FAPPS_VALIDATOR_PASSWORD:?FAPPS_VALIDATOR_PASSWORD must be set}
+    FILEX_PLUGINS_DISABLED: "1"
+    FILEX_APP_PLUGINS_DISABLED: "0"
+    FILEX_PLUGIN_LOOPBACK_SOURCES: "1"
+    SSL_CERT_FILE: /e2e-ca/ca.pem
+  extra_hosts: *github-hosts
+  volumes:
+    - e2e-ca:/e2e-ca:ro
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5212/healthz || exit 1"]
+    interval: 3s
+    timeout: 3s
+    retries: 60
+  depends_on:
+    mock-idp:
+      condition: service_healthy
+
+x-mock-image: &mock-image
+  image: side-apps-e2e/mock-idp:e2e
+  pull_policy: never
+
+services:
+  demo-postgres:
+    image: ${E2E_POSTGRES_IMAGE:-postgres:16.15-alpine}
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${E2E_PG_SUPERPASS:?run secrets missing}
+      E2E_DB_PASSWORD: ${E2E_DB_PASSWORD:?run secrets missing}
+    volumes:
+      - ./e2e/postgres-init:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "demo_fapps", "-d", "demo_fapps"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  demo-redis:
+    image: ${E2E_REDIS_IMAGE:-redis:7.4.11-alpine}
+    command: ["redis-server", "--appendonly", "yes"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    image: side-apps-e2e/fapps:e2e
+    build:
+      args:
+        GO_IMAGE: ${GO_IMAGE:-golang:1.25-bookworm}
+        VERSION: e2e
+    env_file:
+      - .env.example
+      - e2e/stack.env
+    environment:
+      DB_PASSWORD: ${E2E_DB_PASSWORD}
+      DATABASE_URL: postgresql://demo_fapps:${E2E_DB_PASSWORD}@demo-postgres:5432/demo_fapps
+      FAPPS_SESSION_KEY: ${FAPPS_SESSION_KEY:?run secrets missing}
+      FAPPS_DATA_KEY: ${FAPPS_DATA_KEY:?run secrets missing}
+      FAPPS_GITHUB_CLIENT_SECRET: ${FAPPS_GITHUB_CLIENT_SECRET:?run secrets missing}
+      FAPPS_ADMIN_TOKEN: ${FAPPS_ADMIN_TOKEN:?run secrets missing}
+      SSL_CERT_FILE: /e2e-ca/ca.pem
+    extra_hosts: *github-hosts
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+      - ./e2e/fixtures/brand:/brand:ro
+    healthcheck:
+      test: ["CMD", "/fapps-server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+      mock-idp:
+        condition: service_healthy
+
+  filex-latest: *validator-e2e
+  filex-floor: *validator-e2e
+
+  mock-idp:
+    image: side-apps-e2e/mock-idp:e2e
+    build:
+      context: e2e
+      dockerfile: mock-idp/Dockerfile
+      args:
+        GO_IMAGE: ${GO_IMAGE:-golang:1.25-bookworm}
+    command: ["serve"]
+    environment:
+      MOCK_PUBLIC_URL: https://mock-idp:9443
+      MOCK_TOKEN_KEY: ${MOCK_TOKEN_KEY:?run secrets missing}
+      MOCK_GITHUB_CLIENT_ID: ${FAPPS_GITHUB_CLIENT_ID:?}
+      MOCK_GITHUB_CLIENT_SECRET: ${FAPPS_GITHUB_CLIENT_SECRET:?run secrets missing}
+      MOCK_GITHUB_REDIRECT_URIS: https://fapps.e2e.test/auth/github/callback
+      MOCK_GITHUB_ADMIN_TOKEN: ${FAPPS_ADMIN_TOKEN:?run secrets missing}
+      MOCK_CORRUPT_ASSETS: ${E2E_CORRUPT_ASSETS:-0}
+    volumes:
+      - e2e-ca:/e2e-ca
+    healthcheck:
+      test: ["CMD", "/mock-idp", "healthcheck", "http://127.0.0.1:9000/__health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  edge:
+    <<: *mock-image
+    command: ["edge"]
+    environment:
+      MOCK_EDGE_UPSTREAM: http://app:8080
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+    networks:
+      default:
+        aliases:
+          - fapps.e2e.test
+    healthcheck:
+      test: ["CMD", "/mock-idp", "healthcheck", "https://127.0.0.1/__edge/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      mock-idp:
+        condition: service_healthy
+
+  gh-latest:
+    <<: *mock-image
+    command: ["github-tls"]
+    network_mode: "service:filex-latest"
+    environment:
+      MOCK_CORRUPT_ASSETS: ${E2E_CORRUPT_ASSETS:-0}
+      MOCK_TOKEN_KEY: ${MOCK_TOKEN_KEY:?run secrets missing}
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+    healthcheck:
+      test: ["CMD", "/mock-idp", "healthcheck", "https://127.0.0.1/__health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      mock-idp:
+        condition: service_healthy
+
+  gh-floor:
+    <<: *mock-image
+    command: ["github-tls"]
+    network_mode: "service:filex-floor"
+    environment:
+      MOCK_CORRUPT_ASSETS: ${E2E_CORRUPT_ASSETS:-0}
+      MOCK_TOKEN_KEY: ${MOCK_TOKEN_KEY:?run secrets missing}
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+    healthcheck:
+      test: ["CMD", "/mock-idp", "healthcheck", "https://127.0.0.1/__health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      mock-idp:
+        condition: service_healthy
+
+  gh-app:
+    <<: *mock-image
+    command: ["github-tls"]
+    network_mode: "service:app"
+    environment:
+      MOCK_CORRUPT_ASSETS: ${E2E_CORRUPT_ASSETS:-0}
+      MOCK_TOKEN_KEY: ${MOCK_TOKEN_KEY:?run secrets missing}
+      MOCK_GITHUB_ADMIN_TOKEN: ${FAPPS_ADMIN_TOKEN:?run secrets missing}
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+    healthcheck:
+      test: ["CMD", "/mock-idp", "healthcheck", "https://127.0.0.1/__health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      mock-idp:
+        condition: service_healthy
+
+  playwright:
+    image: side-apps-e2e/runner:e2e
+    build:
+      context: e2e
+      dockerfile: runner.Dockerfile
+      additional_contexts:
+        backend: ./backend
+      args:
+        GO_IMAGE: ${GO_IMAGE:-golang:1.25-bookworm}
+    profiles: ["run"]
+    init: true
+    shm_size: 1gb
+    environment:
+      E2E_BASE_URL: https://fapps.e2e.test
+      E2E_MOCK_URL: https://mock-idp:9443
+      E2E_VALIDATORS: ${FAPPS_VALIDATORS:?}
+      E2E_VALIDATOR_EMAIL: ${FAPPS_VALIDATOR_EMAIL:-validator@local}
+      E2E_VALIDATOR_PASSWORD: ${FAPPS_VALIDATOR_PASSWORD:?}
+      E2E_BROWSERS: ${E2E_BROWSERS:-chromium,firefox,webkit}
+      E2E_GREP: ${E2E_GREP:-}
+      E2E_OUT: /out
+      SSL_CERT_FILE: /e2e-ca/ca.pem
+      NODE_EXTRA_CA_CERTS: /e2e-ca/ca.pem
+      HOME: /root
+    volumes:
+      - e2e-ca:/e2e-ca:ro
+      - ${E2E_OUT:-./e2e/out}:/out
+    depends_on:
+      app:
+        condition: service_healthy
+      edge:
+        condition: service_healthy
+
+volumes:
+  e2e-ca:

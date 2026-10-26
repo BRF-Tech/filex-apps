@@ -1,0 +1,3229 @@
+openapi: 3.1.0
+info:
+  title: filex Apps store API
+  version: 0.1.0-draft
+  summary: Catalog, publishing pipeline, review and the signed index of filex apps and language packs.
+  description: |
+    The contract between the store's parts (backend, web interface, validators, deployment) and the
+    filex client that reads the signed index (docs/ARCHITECTURE.md).
+
+    Conventions:
+    - Every error answers `Error` (`{"error": "<code>", "message": "<sentence>"}`) with a meaningful status.
+    - Times are RFC 3339 in UTC. Hashes are lower-case hex. Localised strings are `Text` objects
+      (`{"en": "...", "tr": "..."}`), English always present.
+    - Sessions are cookies (`fapps_session`, HttpOnly, Secure, SameSite=Lax). Every request that changes
+      state (POST, PUT, PATCH, DELETE) under `/api/` and `/auth/logout` must carry `X-CSRF-Token` equal to
+      the session's token (from `GET /api/v1/me`) AND an `Origin` (or `Referer`) of the store itself;
+      otherwise `403 csrf_failed`.
+    - Rate limits answer `429 rate_limited` with `Retry-After`.
+    - Paths under `/v1/` are the filex client contract: public, cacheable, stable within `schema: 1`.
+      Paths under `/api/v1/` serve the web interface and may change with it.
+    - Signed answers (`SignedEnvelope`: the license verdict, an install intent) carry
+      `{"payload": {...}, "key_id": "<id>", "signature": "<hex>"}`. `signature` is ed25519 by the key
+      `key_id` (listed in `/v1/keys.json`) over the lower-case hex sha256 of the payload's CANONICAL JSON:
+      object keys sorted by their UTF-8 bytes, no insignificant whitespace, no trailing newline, UTF-8,
+      `<` `>` `&` written as themselves (no HTML escaping), the escapes of Go's `encoding/json` for the rest.
+      The store never puts a control character, U+2028 or U+2029 in a payload string, so a JavaScript
+      `JSON.stringify` of the sorted tree gives the same bytes. Re-canonicalize the payload as a generic
+      JSON tree (never through a struct, which reorders or drops keys); an optional field is absent, never
+      `null`. Same scheme as the index's signature (filex `plugin.VerifyDetached`), over these bytes.
+servers:
+  - url: https://apps.filex.sh
+    description: the reference store (filex's own); every store answers the same contract at its own address
+tags:
+  - name: health
+  - name: index
+    description: The signed index and what it points at - what a filex reads. Public.
+  - name: catalog
+    description: Read-only JSON for the web interface. Public.
+  - name: auth
+    description: |
+      Sign-in. Everyone signs in with GitHub (one OAuth App, no scopes). The store roles come from the
+      account's permission on the administration repository (`FAPPS_ADMIN_REPO`), read with the server's
+      token at every sign-in: `admin`, `maintain` or `write` make an administrator, `triage` a reviewer;
+      and from the lists `FAPPS_ADMINS` and `FAPPS_REVIEWERS`, which name GitHub accounts by their numeric
+      user id. With both, a person holds the higher role.
+  - name: me
+  - name: publishing
+    description: A signed-in publisher (GitHub identity).
+  - name: review
+    description: Role `reviewer` or `admin` (from the administration repository's permission or the lists).
+  - name: admin
+    description: Role `admin` (from the administration repository's permission or `FAPPS_ADMINS`).
+  - name: licensing
+    description: |
+      Paid apps. A publisher member of the app's publisher (or an administrator) sets the price and
+      generates license keys; a filex server checks a key with `POST /v1/licenses/verify` and gets a verdict
+      signed with the store's `license` key. The store keeps only an HMAC of each key.
+  - name: install
+    description: |
+      Install links. A signed-in person asks for an install intent and gets a one-time magic link to their
+      own filex (`/admin/store-install#store=...&intent=...`); that filex's server reads the intent
+      (`GET /v1/install/{token}`, signed with the index key) and reports the outcome. Saved filex
+      instances are kept encrypted, for their owner only.
+  - name: notifications
+    description: |
+      A signed-in person's notifications: webhooks (the generic JSON format signed with HMAC-SHA256, or a
+      Slack, Discord or Teams message) and browser notifications (Web Push with VAPID), and the events
+      each one hears. Everything is the caller's own; the administrators' events
+      (`submission.app_new`, `submission.version_new`, `publisher.requested`, `pipeline.error`) are offered
+      to an administrator only and reach an account only while GitHub still says it is one. A webhook's
+      address, signing secret and header value, and a browser's push endpoint and keys, are stored
+      encrypted (a key derived from `FAPPS_DATA_KEY`); the list shows the address's scheme and host only.
+
+      The generic format posts this JSON (`application/json`):
+      `{"id", "event", "occurred_at", "source", "title", "message", "severity", "action_url", "data"}` -
+      `id` is the delivery (the same on every retry), `severity` is `info`, `success`, `warning` or `danger`,
+      `action_url` the store's page to act on, `data` the event's facts. Headers: `X-Fapps-Event`,
+      `X-Fapps-Delivery`, `X-Fapps-Timestamp` (Unix seconds) and `X-Fapps-Signature`:
+      `sha256=` + lower-hex HMAC-SHA256, keyed with the webhook's secret, of the timestamp, a full stop and
+      the body; plus the one header the owner set (an API key). A delivery is tried once and retried after
+      10, 30 and 90 seconds when the receiver did not answer, answered 408, 425, 429 or 5xx; another answer
+      is final. Every address must be https and public: it is checked after DNS on every connection and
+      every redirect (a private, loopback, link-local or metadata address is never called).
+  - name: instances
+    description: |
+      Instance connections. A person connects a saved instance to its filex with a one-time code
+      (`POST /api/v1/me/instances/{id}/connect-code`); the filex server spends it with the public half of an
+      ed25519 key it made for this store (`POST /v1/instances/connect`) and from then on signs its own
+      requests: it asks for install intents for its own address (`POST /v1/instances/{id}/intents`), which
+      it reads and holds to its review like any other. The store keeps the public key only.
+
+      A signed request carries five headers: `Fapps-Instance` (the saved instance's id), `Fapps-Key` (the
+      key's fingerprint: lower-hex sha256 of its 32 raw bytes), `Fapps-Timestamp` (Unix seconds),
+      `Fapps-Nonce` (16-64 characters of `A-Z a-z 0-9 _ -`, new for every request) and `Fapps-Signature`
+      (lower-hex ed25519). The signature is over the lower-hex sha256 of these eight lines joined by a
+      newline: `FAPPS-INSTANCE-REQUEST-1`, the method in upper case, the path as sent (no query), the
+      instance id, the key fingerprint, the timestamp, the nonce, and the lower-hex sha256 of the body (of
+      no bytes for an empty body). The store refuses a timestamp more than 5 minutes from its clock
+      (`401 request_expired`), a nonce the instance sent in the last 10 minutes (`401 request_replayed`),
+      and anything else that does not hold - unknown instance, another key, a bad signature, a path that
+      names another instance - with one answer, `401 instance_unauthorized`. The key opens these
+      `/v1/instances/{id}/...` paths of its own instance and nothing else. Test vector:
+      `backend/internal/install/testdata/request-vector.json` (made with Node's crypto).
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      operationId: healthz
+      summary: Liveness
+      responses:
+        '200':
+          description: The process serves HTTP.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readyz
+      summary: Readiness (configuration complete, database migrated, a signed index exists)
+      responses:
+        '200':
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ready' }
+        '503':
+          description: Not ready; `missing` says what.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ready' }
+
+  # ------------------------------------------------------------------ index (filex contract)
+  /v1/index.json:
+    get:
+      tags: [index]
+      operationId: getIndex
+      summary: The signed index (latest release)
+      description: |
+        The exact bytes of the latest `index_releases` row. Verify with `/v1/index.json.sig`: ed25519 by an
+        `index` key over the lower-hex sha256 of these bytes (filex `plugin.VerifyDetached`). A client
+        refuses a document whose `expires_at` has passed or whose `serial` is lower than the highest it
+        has accepted. `ETag` is the body's sha256; `X-Index-Serial` is the serial.
+      responses:
+        '200':
+          description: The index.
+          headers:
+            ETag: { schema: { type: string } }
+            X-Index-Serial: { schema: { type: integer } }
+            Cache-Control: { schema: { type: string, example: 'public, max-age=300' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Index' }
+        '304': { description: Not modified (If-None-Match). }
+        '503':
+          description: No index has been generated yet (`index_not_ready`). Never an empty document.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/index.json.sig:
+    get:
+      tags: [index]
+      operationId: getIndexSignature
+      summary: Detached signature of the latest index
+      description: Lower-case hex ed25519 signature (128 characters) and a newline. Same release as `/v1/index.json` (`X-Index-Serial`).
+      responses:
+        '200':
+          description: The signature.
+          headers:
+            X-Index-Serial: { schema: { type: integer } }
+          content:
+            text/plain:
+              schema: { type: string, pattern: '^[0-9a-f]{128}$' }
+        '503':
+          description: No index yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/keys.json:
+    get:
+      tags: [index]
+      operationId: getKeys
+      summary: The store's public keys (index, artifact and license), with their status
+      description: |
+        Informational. A filex trusts the keys it was BUILT or CONFIGURED with, never this answer alone. The
+        `license` key signs the license verdicts of `POST /v1/licenses/verify`; it is not in the index's `keys`.
+      responses:
+        '200':
+          description: Keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items: { $ref: '#/components/schemas/StoreKey' }
+  /v1/media/{file}:
+    get:
+      tags: [index]
+      operationId: getMedia
+      summary: A mirrored image, addressed by its sha256
+      parameters:
+        - name: file
+          in: path
+          required: true
+          description: '`<sha256>.<ext>`, ext one of png, jpg, webp.'
+          schema: { type: string, pattern: '^[0-9a-f]{64}[.](png|jpg|webp)$' }
+      responses:
+        '200':
+          description: 'The image; `Cache-Control: public, max-age=31536000, immutable`.'
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/releases:
+    get:
+      tags: [index]
+      operationId: listIndexReleases
+      summary: Every signed index ever served (newest first) - for audit and mirrors
+      x-phase: 2
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: Releases.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/IndexRelease' }
+                  total: { type: integer }
+  /v1/releases/{serial}/index.json:
+    get:
+      tags: [index]
+      operationId: getIndexRelease
+      summary: The exact bytes of one past index
+      x-phase: 2
+      parameters:
+        - { name: serial, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: That release's body.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Index' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/releases/{serial}/index.json.sig:
+    get:
+      tags: [index]
+      operationId: getIndexReleaseSignature
+      summary: That release's signature
+      x-phase: 2
+      parameters:
+        - { name: serial, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Lower-case hex and a newline.
+          content:
+            text/plain:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ catalog
+  /api/v1/apps:
+    get:
+      tags: [catalog]
+      operationId: listApps
+      summary: Search and list the catalog
+      description: |
+        Listed apps only (unlisted and revoked are absent). Built from the same rows as the latest index.
+
+        **File-type search.** When every word of `q` is an extension (`.docx`, `*.docx`, `DOCX`, or
+        several: `pdf docx`), the search is for the apps that work with those kinds of file instead of
+        a text search. A word with a leading dot (or `*.`) is always read as an extension; a bare word
+        only when it is one filex knows or a listed app's newest version names (so `docx` is a
+        file-type search and `sign` stays a word). The items are then the apps whose shown version (the
+        newest not yanked, or with `filex` the `compatible` one) works with at least one of the kinds,
+        each with `matched_extensions`: first the apps that name a kind (the more of the searched kinds,
+        the earlier; `sort` orders within that), then the apps that are here only for something they
+        offer on every file. The answer carries `file_types`: the kinds searched for, what filex does
+        with each by itself (`builtin`, from a filex release) and other apps whose text names them
+        (`near`). The kinds an app works with come from its approved manifest (its viewers, New-menu
+        rows, thumbnails, file-menu actions and details sections), extracted at approval, and from the
+        conversions its listing declares (`convert` roles: a search for `.docx` names an app that converts
+        `.docx`, so it counts in `named`).
+      parameters:
+        - { name: q, in: query, description: 'Words matched against name, label, summary and publisher; or extensions, a file-type search (above).', schema: { type: string, maxLength: 100 } }
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/AppKind' } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: publisher, in: query, schema: { type: string } }
+        - name: filex
+          in: query
+          description: A filex version (`0.50.0`); keeps apps that have a non-yanked version whose range admits it, and reports that version as `compatible`.
+          schema: { type: string, pattern: '^[0-9]+[.][0-9]+[.][0-9]+$' }
+        - { name: verified, in: query, description: 'Only apps of verified publishers.', schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [name, updated, published], default: name } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/apps/{name}:
+    get:
+      tags: [catalog]
+      operationId: getApp
+      summary: One app's page
+      description: Listed and unlisted apps answer; a revoked app answers with `revoked` set (its page says why).
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      responses:
+        '200':
+          description: The app.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/apps/{name}/pricing:
+    put:
+      tags: [licensing]
+      operationId: setAppPricing
+      summary: Set an app's price (free or paid)
+      description: |
+        A member of the app's publisher (the publisher active) or an administrator. Display only: the
+        store takes no payment; `purchase_url` is where a buyer goes. A free app carries neither
+        `price_text` nor `purchase_url`. Does not change the signed index.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Pricing' }
+      responses:
+        '200':
+          description: Set.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pricing' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/apps/{name}/licenses:
+    get:
+      tags: [licensing]
+      operationId: listAppLicenses
+      summary: An app's licenses, newest first (never the keys)
+      description: A member of the app's publisher (the publisher active) or an administrator.
+      security:
+        - session: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LicensePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [licensing]
+      operationId: createLicense
+      summary: Generate a license key for an app - the key is shown in this answer only
+      description: |
+        A member of the app's publisher (the publisher active) or an administrator. The key is
+        `FXL-` and 26 Crockford base32 characters (130 random bits) in groups of four, e.g.
+        `FXL-7K2Q-9WXM-...-AB`. The store keeps an HMAC of it and its first 8 characters (`key_prefix`);
+        it never stores, logs or shows the key again.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LicenseCreate' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LicenseCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/apps/{name}/versions/{version}:
+    get:
+      tags: [catalog]
+      operationId: getAppVersion
+      summary: One version, with filex's own words for its permissions
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+        - { $ref: '#/components/parameters/Version' }
+      responses:
+        '200':
+          description: The version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/publishers/{id}:
+    get:
+      tags: [catalog]
+      operationId: getPublisher
+      summary: A publisher and its listed apps
+      parameters:
+        - { $ref: '#/components/parameters/PublisherId' }
+      responses:
+        '200':
+          description: The publisher.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [publisher, apps]
+                properties:
+                  publisher: { $ref: '#/components/schemas/Publisher' }
+                  apps:
+                    type: array
+                    items: { $ref: '#/components/schemas/AppSummary' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/store:
+    get:
+      tags: [catalog]
+      operationId: getStore
+      summary: How this store presents itself (its name, logo and who runs it)
+      description: |
+        From the store's configuration (`FAPPS_STORE_NAME`, `FAPPS_STORE_LOGO`, `FAPPS_OPERATOR_NAME`,
+        `FAPPS_OPERATOR_URL`, `FAPPS_CONTACT`, `FAPPS_TERMS_URL`, `FAPPS_PRIVACY_URL`), answered before the
+        database is ready too. The web interface shows the name as its brand and the rest in its footer.
+        `Cache-Control: public, max-age=300`. Outside the per-address API rate limit: every page load asks for it.
+      responses:
+        '200':
+          description: The store.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoreInfo' }
+  /api/v1/store/logo:
+    get:
+      tags: [catalog]
+      operationId: getStoreLogo
+      summary: The store's own logo (`FAPPS_STORE_LOGO`), from its own origin
+      description: |
+        The operator's file as it is, with a sandboxing `Content-Security-Policy` (an SVG opened on its own
+        runs no script and loads nothing), an `ETag` (its sha256) and `Cache-Control: public, max-age=86400`.
+        `StoreInfo.logo_url` names it with a `v` that changes with the image. 404 when the store has none.
+      parameters:
+        - { name: v, in: query, required: false, description: 'Ignored by the server: it changes with the image, so no cache keeps an old one.', schema: { type: string } }
+      responses:
+        '200':
+          description: The logo.
+          content:
+            image/svg+xml: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '304': { description: The `If-None-Match` names this image. }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/categories:
+    get:
+      tags: [catalog]
+      operationId: listCategories
+      summary: The category ids and their labels
+      responses:
+        '200':
+          description: Categories in display order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+
+  # ------------------------------------------------------------------ auth
+  /auth/github/login:
+    get:
+      tags: [auth]
+      operationId: githubLogin
+      summary: Start a GitHub sign-in (everyone)
+      description: Redirects to GitHub's authorize URL with `state` (bound to a short-lived signed cookie) and no scopes beyond public data.
+      parameters:
+        - { $ref: '#/components/parameters/ReturnTo' }
+      responses:
+        '302': { description: To GitHub. }
+        '503': { $ref: '#/components/responses/NotConfigured' }
+  /auth/github/callback:
+    get:
+      tags: [auth]
+      operationId: githubCallback
+      summary: GitHub's redirect back
+      description: |
+        The code becomes the person's token and the token their account. Then the server asks GitHub, with
+        its own token (`FAPPS_ADMIN_TOKEN`), for the account's permission on the administration repository
+        (`FAPPS_ADMIN_REPO`): `admin`, `maintain` or `write` make the session an administrator's, `triage` a
+        reviewer's; anything else, or a check that cannot be made, signs in with no role from it (it fails
+        closed). An account whose numeric GitHub id is on `FAPPS_ADMINS` (or `FAPPS_REVIEWERS`) is an
+        administrator (a reviewer) whatever the repository says; the session holds the higher role. The roles and their source are fixed for the session's life and read again at the next
+        sign-in; a session with a role lasts 12 hours, one without 7 days.
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '302': { description: Signed in; to `return_to` (a path on the store) or `/`. Sets `fapps_session`. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session
+      security:
+        - session: []
+          csrf: []
+      responses:
+        '204': { description: Signed out (session row deleted, cookie cleared). }
+
+  # ------------------------------------------------------------------ me
+  /api/v1/me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: Who is signed in, with what roles and publishers, and the CSRF token
+      description: |
+        Both answers carry `providers`: which sign-ins this server can start. The web interface reads it
+        here instead of probing `/auth/*/login`, which counts against the sign-in rate limit; this endpoint
+        is under the general API limit only.
+      responses:
+        '200':
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401':
+          description: Not signed in (`unauthorized`), with the sign-ins that can be started.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedOut' }
+  /api/v1/me/apps:
+    get:
+      tags: [me]
+      operationId: myApps
+      summary: The apps of the publishers the caller is a member of, in every status
+      description: What the publisher's area lists to set prices and manage licenses. Each row says the app's status.
+      security:
+        - session: []
+      responses:
+        '200':
+          description: The apps (name order).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminApp' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/me/instances:
+    get:
+      tags: [install]
+      operationId: listMyInstances
+      summary: The caller's saved filex instances
+      description: |
+        Only the owner sees them. The address and the label are stored encrypted (AES-256-GCM with a key
+        derived from `FAPPS_DATA_KEY`); duplicates are found through a keyed hash, never the address.
+      security:
+        - session: []
+      responses:
+        '200':
+          description: The instances (oldest first).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SavedInstance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [install]
+      operationId: saveMyInstance
+      summary: Save a filex instance
+      description: |
+        The address is normalized to its origin (https only; `http://localhost` and `http://127.0.0.1` with
+        APP_ENV=development). Saving an address the caller already saved answers `200` with that instance
+        (the label is not changed); a new one `201`. At most 50 per account (`instances_full`).
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SavedInstanceCreate' }
+      responses:
+        '200':
+          description: Already saved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavedInstance' }
+        '201':
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavedInstance' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/instances/{id}:
+    delete:
+      tags: [install]
+      operationId: deleteMyInstance
+      summary: Forget a saved filex instance
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Forgotten. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/me/instances/{id}/connect-code:
+    post:
+      tags: [instances]
+      operationId: createConnectCode
+      summary: Make a one-time code that connects a filex server to this saved instance
+      description: |
+        The owner only. The code (`fxc_` and 43 characters of base64url) is in this answer once; the store
+        keeps its sha256. Valid 30 minutes, spent by the first connection; at most 5 unused codes per
+        instance (`409 connect_codes_full`). The filex's administrator pastes it into filex, which connects
+        with it. 10 codes an hour per account.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: The code.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectCode' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/instances/{id}/connection:
+    delete:
+      tags: [instances]
+      operationId: disconnectMyInstance
+      summary: Disconnect the filex server of a saved instance
+      description: The owner only. The key is forgotten; the filex's signed requests are refused from then on.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Disconnected. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ------------------------------------------------------------------ publishing
+  /api/v1/publishers:
+    get:
+      tags: [catalog]
+      operationId: listPublishers
+      summary: The public list of publishers
+      description: |
+        Active publishers only (pending and suspended ones are absent), with the number of their listed
+        apps (apps with an approved version; unlisted and revoked ones are not counted). The avatar is the
+        GitHub owner's, mirrored by this store when the publisher became active (never a link to GitHub);
+        the description is the GitHub owner's profile text at that time. Both may be absent.
+      parameters:
+        - { name: q, in: query, description: 'Words matched against id, name, GitHub owner and description.', schema: { type: string, maxLength: 100 } }
+        - { name: sort, in: query, description: '`name` (A to Z) or `apps` (most listed apps first, then name).', schema: { type: string, enum: [name, apps], default: name } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublisherPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [publishing]
+      operationId: requestPublisher
+      summary: Ask for a publisher bound to a GitHub account or organization
+      description: |
+        Phase 1 is curated: the publisher is created `pending` and an administrator activates it. For a
+        user owner the submitter must be that GitHub account; for an organization the administrator
+        confirms ownership before activating (no `read:org` scope is asked; docs/ARCHITECTURE.md Q5).
+        The binding is the owner's NUMERIC id. The submitter becomes the publisher's `owner` member.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublisherRequest' }
+      responses:
+        '201':
+          description: Created, pending.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Publisher' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/submissions:
+    post:
+      tags: [publishing]
+      operationId: createSubmission
+      summary: Submit a repository at a tag
+      description: |
+        Synchronously: the session's GitHub identity must be a member of the publisher, the repository must
+        be public and the identity must have `admin` or `maintain` permission on it (GitHub's own answer,
+        with the identity's token). Everything else runs in the pipeline: the answer is `202` with the
+        submission `queued`; poll `GET /api/v1/submissions/{id}`.
+
+        Refusals of the synchronous part: `403` `not_a_member`, `publisher_not_active`, `github_required`,
+        `github_token_invalid`, `repo_private`, `repo_archived`, `repo_permission`, `owner_mismatch` (the
+        repository's owner is not the publisher's bound GitHub owner); `503` `github_unavailable`.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmissionRequest' }
+      responses:
+        '202':
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`submission_open` (this repository at this tag is already in the pipeline; the body carries it) or `version_exists`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    get:
+      tags: [publishing]
+      operationId: listSubmissions
+      summary: Submissions the caller may see
+      description: A publisher sees its publishers' submissions; a reviewer sees all.
+      security:
+        - session: []
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/SubmissionStatus' } }
+        - { name: publisher, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/submissions/{id}:
+    get:
+      tags: [publishing]
+      operationId: getSubmission
+      summary: One submission with its checks, dry runs and reviews
+      security:
+        - session: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      responses:
+        '200':
+          description: The submission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/submissions/{id}/withdraw:
+    post:
+      tags: [publishing]
+      operationId: withdrawSubmission
+      summary: Withdraw a submission that is not decided yet
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      responses:
+        '200':
+          description: Withdrawn.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/submissions/{id}/retry:
+    post:
+      tags: [publishing]
+      operationId: retrySubmission
+      summary: Run the pipeline again for a `failed` submission (a new attempt; the tag is resolved again)
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      responses:
+        '202':
+          description: Queued again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  # ------------------------------------------------------------------ review
+  /api/v1/review/queue:
+    get:
+      tags: [review]
+      operationId: reviewQueue
+      summary: Submissions waiting for a decision (oldest first)
+      security:
+        - session: []
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/review/submissions/{id}/approve:
+    post:
+      tags: [review]
+      operationId: approveSubmission
+      summary: Approve - writes the version, signs its artifacts, publishes a new signed index
+      description: |
+        Only a `needs_review` submission whose checks all passed (or warned). In one transaction: the
+        version row (with the artifact key's signatures over its hashes), the app row on a first
+        approval, the listing from the consent file, the audit row; then the index is rebuilt and signed
+        with `serial` + 1. The answer names the new serial.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveRequest' }
+      responses:
+        '200':
+          description: Approved and published.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [submission, version, index_serial]
+                properties:
+                  submission: { $ref: '#/components/schemas/Submission' }
+                  version: { $ref: '#/components/schemas/VersionDetail' }
+                  index_serial: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/review/submissions/{id}/reject:
+    post:
+      tags: [review]
+      operationId: rejectSubmission
+      summary: Reject, with a reason the publisher reads
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Rejected.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/review/submissions/{id}/comment:
+    post:
+      tags: [review]
+      operationId: commentSubmission
+      summary: Leave a note for the publisher without deciding
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Review' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/review/submissions/{id}/recheck:
+    post:
+      tags: [review]
+      operationId: recheckSubmission
+      summary: Run the dry runs again (e.g. after a validator image moved to a new filex)
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/SubmissionId' }
+      responses:
+        '202':
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Submission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------ admin
+  /api/v1/admin/apps:
+    get:
+      tags: [admin]
+      operationId: adminListApps
+      summary: Every app in any status (listed, unlisted, revoked)
+      description: |
+        The catalog's list for reviewers and administrators: unlike `GET /api/v1/apps` it also holds
+        unlisted and revoked apps, and each row says which. Roles `reviewer` or `admin`.
+      security:
+        - session: []
+      parameters:
+        - { name: status, in: query, description: 'Default `all`.', schema: { type: string, enum: [listed, unlisted, revoked, all], default: all } }
+        - { name: q, in: query, description: 'Words matched against name, label, summary and publisher.', schema: { type: string, maxLength: 100 } }
+        - { name: sort, in: query, schema: { type: string, enum: [name, updated], default: name } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAppPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/apps/{name}:
+    patch:
+      tags: [admin]
+      operationId: adminUpdateApp
+      summary: List or unlist an app, or correct its categories
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [listed, unlisted] }
+                categories:
+                  type: array
+                  items: { type: string }
+                  maxItems: 3
+      responses:
+        '200':
+          description: Updated; a new index is published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/apps/{name}/revoke:
+    post:
+      tags: [admin]
+      operationId: revokeApp
+      summary: Revoke an app (harmful) - installed copies are told to remove it
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Revoked; a new index is published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [admin]
+      operationId: unrevokeApp
+      summary: Lift a revocation
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+      responses:
+        '200':
+          description: Lifted; a new index is published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/apps/{name}/versions/{version}/yank:
+    post:
+      tags: [admin]
+      operationId: yankVersion
+      summary: Yank a version - no new installs; installed copies are warned
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+        - { $ref: '#/components/parameters/Version' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Yanked; a new index is published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [admin]
+      operationId: unyankVersion
+      summary: Lift a yank
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/AppName' }
+        - { $ref: '#/components/parameters/Version' }
+      responses:
+        '200':
+          description: Lifted; a new index is published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/publishers:
+    get:
+      tags: [admin]
+      operationId: adminListPublishers
+      summary: Publishers, pending first
+      security:
+        - session: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, active, suspended] } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Publisher' }
+                  total: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/publishers/{id}:
+    patch:
+      tags: [admin]
+      operationId: adminUpdatePublisher
+      summary: Activate, suspend, verify or mark official
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PublisherId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [active, suspended] }
+                status_reason: { type: string, maxLength: 500 }
+                verified: { type: boolean }
+                official: { type: boolean }
+      responses:
+        '200':
+          description: Updated; a new index is published when the index's publisher row changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Publisher' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/index/publish:
+    post:
+      tags: [admin]
+      operationId: publishIndex
+      summary: Re-sign the index now (same content, serial + 1, new expires_at)
+      description: The daily refresh does this on its own when less than FAPPS_INDEX_REFRESH_DAYS are left.
+      security:
+        - session: []
+          csrf: []
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndexRelease' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/keys:
+    get:
+      tags: [admin]
+      operationId: adminListKeys
+      summary: Signing keys (public halves) and their status
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SigningKey' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/health:
+    get:
+      tags: [admin]
+      operationId: adminHealth
+      summary: What the store depends on beyond itself, as an administrator needs to see it
+      description: |
+        Today: where the store roles come from. The server asks GitHub again on every call, with its own
+        token, whether it still sees the administration repository, so an expired or refused token, or a
+        fine-grained token the organization has not approved yet, shows here (and in `/readyz`'s
+        `warnings`) instead of looking like "nobody is an administrator".
+      security:
+        - session: []
+      responses:
+        '200':
+          description: The health.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminHealth' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/validators:
+    get:
+      tags: [admin]
+      operationId: adminListValidators
+      summary: The filex instances the dry run uses, their versions and health
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Validators.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ValidatorStatus' }
+                  plugin_validators:
+                    type: array
+                    description: The plugin validators storage plugin submissions run on (FAPPS_PLUGIN_VALIDATORS); empty when none is configured.
+                    items: { $ref: '#/components/schemas/PluginValidatorStatus' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/audit:
+    get:
+      tags: [admin]
+      operationId: adminAudit
+      summary: The audit log (newest first)
+      security:
+        - session: []
+      parameters:
+        - { name: action, in: query, schema: { type: string } }
+        - { name: target_type, in: query, schema: { type: string } }
+        - { name: target_id, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PerPage' }
+      responses:
+        '200':
+          description: One page; `chain_ok` is false when a row's hash does not follow from the one before.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, chain_ok]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditEntry' }
+                  total: { type: integer }
+                  chain_ok: { type: boolean }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------ licensing
+  /api/v1/licenses/{id}/revoke:
+    post:
+      tags: [licensing]
+      operationId: revokeLicense
+      summary: Revoke a license - every later check answers `revoked`
+      description: A member of the app's publisher (the publisher active) or an administrator. Not reversible.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/LicenseId' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, maxLength: 500, description: For the audit log. }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/License' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/licenses/{id}/activations:
+    get:
+      tags: [licensing]
+      operationId: listLicenseActivations
+      summary: The filex instances that use a license (active ones first)
+      security:
+        - session: []
+      parameters:
+        - { $ref: '#/components/parameters/LicenseId' }
+      responses:
+        '200':
+          description: The activations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Activation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/licenses/{id}/activations/{instance_id}/release:
+    post:
+      tags: [licensing]
+      operationId: releaseLicenseActivation
+      summary: Free a seat - the instance stops counting against the license until it checks in again
+      description: |
+        The instance's next check takes a seat again if one is free (otherwise `seats_exhausted`).
+        `instance_id` is percent-encoded in the path.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { $ref: '#/components/parameters/LicenseId' }
+        - { name: instance_id, in: path, required: true, schema: { $ref: '#/components/schemas/InstanceId' } }
+      responses:
+        '200':
+          description: Released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Activation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/licenses/verify:
+    post:
+      tags: [licensing]
+      operationId: verifyLicense
+      summary: Check a license key for one app on one filex instance (a filex SERVER calls this)
+      description: |
+        Public, no session, no CSRF. Always `200` with a verdict signed by the store's `license` key for a
+        well-formed request (`SignedLicenseVerdict`); an unknown or malformed key is `invalid`, with nothing
+        about any license. `valid` records (or refreshes) the instance's activation: a new instance takes a
+        seat when one is free, else the answer is `seats_exhausted`. Order of the checks: unknown key
+        (`invalid`), a key of another app (`wrong_app`), revoked (`revoked`), past `valid_until` (`expired`),
+        seats (`seats_exhausted`), else `valid`. Rate limits per address and per key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LicenseVerifyRequest' }
+      responses:
+        '200':
+          description: The signed verdict.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedLicenseVerdict' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  # ------------------------------------------------------------------ install
+  # ------------------------------------------------------------------ notifications
+  /api/v1/me/notifications:
+    get:
+      tags: [notifications]
+      operationId: getMyNotifications
+      summary: The caller's notification channels and the events they may choose
+      security:
+        - session: []
+      responses:
+        '200':
+          description: The settings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/notifications/push:
+    put:
+      tags: [notifications]
+      operationId: setMyPushEvents
+      summary: The events the caller's browsers show
+      description: One set for all of the caller's browsers. An empty list turns every event off.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationEvents' }
+      responses:
+        '200':
+          description: The events now chosen.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationEvents' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/push-subscriptions:
+    post:
+      tags: [notifications]
+      operationId: subscribeMyBrowser
+      summary: Keep this browser's push subscription
+      description: |
+        The body is `PushSubscription.toJSON()`, made with the `public_key` of `GET /api/v1/me/notifications`
+        as `applicationServerKey`. The same endpoint again answers `200` with its row (for whichever account
+        subscribes it now); a new one `201`. At most 20 per account (`pushes_full`). The first subscription
+        chooses every event the caller may choose for the browsers. `503 push_unavailable` when the store has
+        no VAPID key.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushSubscriptionCreate' }
+      responses:
+        '200':
+          description: Already kept.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PushSubscription' }
+        '201':
+          description: Kept.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PushSubscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/push-subscriptions/{id}:
+    delete:
+      tags: [notifications]
+      operationId: unsubscribeMyBrowser
+      summary: Forget one of the caller's browsers
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Forgotten. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/me/push-subscriptions/{id}/test:
+    post:
+      tags: [notifications]
+      operationId: testMyBrowser
+      summary: Send a test notification to one of the caller's browsers, now
+      description: Once, no retry. A subscription the push service says is gone (404, 410) is forgotten.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The outcome.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/webhooks:
+    post:
+      tags: [notifications]
+      operationId: createMyWebhook
+      summary: Add a webhook
+      description: |
+        `url` must be https (plain http only with APP_ENV=development) and must not name or resolve to a
+        private, loopback or reserved address (`address_not_public`). `header_name` and `header_value` are
+        for the generic format only. At most 10 per account (`webhooks_full`). A generic webhook's signing
+        secret is in this answer only.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookCreate' }
+      responses:
+        '201':
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/me/webhooks/{id}:
+    patch:
+      tags: [notifications]
+      operationId: updateMyWebhook
+      summary: Rename a webhook or change its events
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookPatch' }
+      responses:
+        '200':
+          description: The webhook.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Webhook' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [notifications]
+      operationId: deleteMyWebhook
+      summary: Delete a webhook
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/me/webhooks/{id}/test:
+    post:
+      tags: [notifications]
+      operationId: testMyWebhook
+      summary: Send a test message to a webhook, now
+      description: Once, no retry; the outcome becomes the webhook's `last`.
+      security:
+        - session: []
+          csrf: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The outcome.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /api/v1/install-intents:
+    post:
+      tags: [install]
+      operationId: createInstallIntent
+      summary: Make a one-time install link to the caller's filex
+      description: |
+        A signed-in person (GitHub). Give `filex_url` (optionally `save_instance` + `instance_label`) or the
+        id of a saved instance (`instance_id`), not both. Without `version` the app's newest version that is
+        not yanked is taken (the store does not know the target filex's version; the intent carries
+        `filex_range` and filex refuses a version outside it). A revoked app refuses (`app_revoked`), as does
+        a yanked version (`version_yanked`). A `license_key` must be an active key of this app
+        (`license_invalid` otherwise); it travels in the intent's payload, sealed in the database until the
+        intent is used or expires.
+
+        The token is 32 random bytes (base64url), stored as its sha256, valid 30 minutes, used once. The
+        magic link puts it in the fragment so it never reaches a server log or a Referer:
+        `<filex origin>/admin/store-install#store=<encodeURIComponent(store origin)>&intent=<token>`.
+      security:
+        - session: []
+          csrf: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallIntentRequest' }
+      responses:
+        '201':
+          description: The link.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallIntentCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/install/{token}:
+    get:
+      tags: [install]
+      operationId: readInstallIntent
+      summary: What a filex reads to act on an install link (signed with the index key)
+      description: |
+        Public (the token is the secret); a filex SERVER calls it. Readable until the intent is completed
+        or expires; `410 intent_used` / `410 intent_expired` after, `404` for a token the store never made.
+        Verify the envelope with the index key the filex trusts.
+      parameters:
+        - { $ref: '#/components/parameters/IntentToken' }
+      responses:
+        '200':
+          description: The signed intent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedInstallIntent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/install/{token}/complete:
+    post:
+      tags: [install]
+      operationId: completeInstallIntent
+      summary: Report what became of an install link; the token is spent
+      description: |
+        Only the first call counts (it marks the token used and drops the sealed license key); a later one,
+        or one after the expiry, answers `410`. No session, no CSRF: a filex server calls it.
+      parameters:
+        - { $ref: '#/components/parameters/IntentToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallIntentComplete' }
+      responses:
+        '200':
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token_id, result, completed_at]
+                properties:
+                  token_id: { type: string }
+                  result: { type: string, enum: [installed, cancelled] }
+                  completed_at: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  # ------------------------------------------------------------------ instances
+  /v1/instances/connect:
+    post:
+      tags: [instances]
+      operationId: connectInstance
+      summary: A filex server spends a connection code with its public key (signed answer)
+      description: |
+        Public (the code is the secret), no session, no CSRF; 10 a minute per address. `filex_origin` is the
+        filex's own address: it must be the address the instance was saved with (`409 wrong_instance`
+        otherwise, and nothing is bound). The answer is signed with an `index` key; the filex checks it with
+        the key it already trusts, that `filex_origin` is its own address and `key_fingerprint` its own key's.
+        A new connection replaces the instance's key before it. `404` for a code the store never made,
+        `410 code_used` / `410 code_expired`, `409 key_in_use` for a key another instance holds.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstanceConnectRequest' }
+      responses:
+        '200':
+          description: The signed connection.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignedInstanceConnection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/instances/{id}/connection:
+    get:
+      tags: [instances]
+      operationId: readInstanceConnection
+      summary: What a connected filex reads about its own connection (a signed request)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The connection.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceConnectionView' }
+        '401': { $ref: '#/components/responses/InstanceUnauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    delete:
+      tags: [instances]
+      operationId: dropInstanceConnection
+      summary: A connected filex lets go of its key (a signed request)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Disconnected. }
+        '401': { $ref: '#/components/responses/InstanceUnauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/instances/{id}/intents:
+    post:
+      tags: [instances]
+      operationId: createInstanceIntent
+      summary: A connected filex asks for an install intent for its own address (a signed request)
+      description: |
+        The intent is the same as a person's (`POST /api/v1/install-intents`): one-time, 30 minutes, its
+        `filex_origin` the instance's saved address, its account the instance's owner; the filex reads it at
+        `GET /v1/install/{token}` and holds it to its own review. Without `version` the newest version that is
+        not yanked. A `license_key` (given by the filex's administrator when they approve) must be an active
+        key of this app with a seat for this filex: one its `filex_instance_id` holds, or a free one
+        (`400 license_invalid` otherwise). 30 an hour per instance, 60 signed requests a minute per address.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstanceIntentRequest' }
+      responses:
+        '201':
+          description: The intent's token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceIntentCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/InstanceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: fapps_session
+    csrf:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    AppName:
+      name: name
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/AppName' }
+    Version:
+      name: version
+      in: path
+      required: true
+      schema: { type: string, maxLength: 64 }
+    PublisherId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/PublisherId' }
+    SubmissionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ReturnTo:
+      name: return_to
+      in: query
+      description: A path on the store (must start with a single `/`); anything else is ignored.
+      schema: { type: string, maxLength: 512 }
+    LicenseId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IntentToken:
+      name: token
+      in: path
+      required: true
+      description: The install link's token (43 characters of base64url).
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+
+  responses:
+    BadRequest:
+      description: The request is malformed (`bad_request`, `invalid_field`, ...).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Not signed in (`unauthorized`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Signed in without the right (`forbidden`, `csrf_failed`, `not_a_member`, `repo_permission`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such thing (`not_found`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: The state does not allow it (`not_pending`, `already_decided`, `name_taken`, `publisher_exists`, ...).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Too many requests (`rate_limited`); see `Retry-After`.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotConfigured:
+      description: This sign-in is not configured on this server (`not_configured`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotImplemented:
+      description: Reserved (`not_implemented`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: |
+        The server cannot do this now: `data_key_missing` (FAPPS_DATA_KEY is not set: licenses, install links,
+        saved instances and notification channels are off), `license_key_missing` (no `license` signing key),
+        `index_key_missing` (no index key to sign an install intent), `push_unavailable` (no VAPID key: no
+        browser notifications).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Gone:
+      description: |
+        The install link was used (`intent_used`) or has expired (`intent_expired`); the connection code was
+        used (`code_used`) or has expired (`code_expired`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    InstanceUnauthorized:
+      description: |
+        A connected filex's signed request does not hold: `instance_unauthorized` (unknown instance, another
+        key, a bad signature, another instance's path - one answer for all), `request_expired` (the timestamp
+        is more than 5 minutes from the store's clock), `request_replayed` (the nonce was used).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, description: Machine-readable code. }
+        message: { type: string, description: A sentence for a person. }
+      additionalProperties: true
+
+    Text:
+      type: object
+      description: A localised string; keys are language tags, English always present.
+      additionalProperties: { type: string }
+
+    Sha256:
+      type: string
+      pattern: '^[0-9a-f]{64}$'
+
+    AppName:
+      type: string
+      description: filex's manifest name rule.
+      pattern: '^[a-z0-9][a-z0-9_-]{0,31}$'
+
+    PublisherId:
+      type: string
+      pattern: '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'
+
+    AppKind:
+      type: string
+      enum: [app, language_pack, storage]
+      description: |
+        `storage` (migration 0010): a filex storage plugin - a program filex runs outside any sandbox, listed
+        from its release's `filex-storage.json` with a build per platform, each pinned and signed.
+
+    Health:
+      type: object
+      required: [status, version, started_at]
+      properties:
+        status: { type: string, const: ok }
+        version: { type: string }
+        started_at: { type: string, format: date-time }
+
+    Ready:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ready, not_ready] }
+        missing:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          description: |
+            Problems that do not stop the store: today the role check (no `FAPPS_ADMIN_TOKEN`, the
+            administration repository not visible to it, GitHub failing: nobody gets a store role) and
+            removed variables that are still set. Absent when there is nothing to say.
+          items: { type: string }
+
+    # -------------------------------------------------------- signed index (schema 1)
+    Index:
+      type: object
+      description: |
+        `/v1/index.json`, schema 1. Written canonically (sorted keys, two-space indent, no HTML escaping,
+        trailing newline). Fields may be added within schema 1; clients ignore unknown fields.
+      required: [schema, serial, generated_at, expires_at, keys, publishers, apps]
+      properties:
+        schema: { type: integer, const: 1 }
+        serial: { type: integer, minimum: 1 }
+        generated_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        keys:
+          type: array
+          items: { $ref: '#/components/schemas/IndexKey' }
+        publishers:
+          type: array
+          items: { $ref: '#/components/schemas/IndexPublisher' }
+        apps:
+          type: array
+          items: { $ref: '#/components/schemas/IndexApp' }
+    IndexKey:
+      type: object
+      required: [id, use, ed25519, status]
+      properties:
+        id: { type: string }
+        use: { type: string, enum: [index, artifact] }
+        ed25519: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { type: string, enum: [active, next, retired] }
+    StoreKey:
+      type: object
+      description: A key of `/v1/keys.json`; `license` signs the license verdicts.
+      required: [id, use, ed25519, status]
+      properties:
+        id: { type: string }
+        use: { type: string, enum: [index, artifact, license] }
+        ed25519: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { type: string, enum: [active, next, retired] }
+    IndexPublisher:
+      type: object
+      required: [id, name, github, verified, official]
+      properties:
+        id: { $ref: '#/components/schemas/PublisherId' }
+        name: { type: string }
+        github: { type: string }
+        verified: { type: boolean }
+        official: { type: boolean }
+    IndexApp:
+      type: object
+      required: [name, kind, publisher, repo, categories, label, screenshots, latest, revoked, versions]
+      properties:
+        name: { $ref: '#/components/schemas/AppName' }
+        kind: { $ref: '#/components/schemas/AppKind' }
+        publisher: { $ref: '#/components/schemas/PublisherId' }
+        repo: { type: string, description: '`owner/name` on GitHub.' }
+        homepage: { type: string }
+        license: { type: string, description: SPDX id. }
+        categories:
+          type: array
+          items: { type: string }
+        label: { $ref: '#/components/schemas/Text' }
+        summary: { $ref: '#/components/schemas/Text' }
+        icon: { $ref: '#/components/schemas/IndexMedia' }
+        screenshots:
+          type: array
+          items: { $ref: '#/components/schemas/IndexMedia' }
+        latest: { type: string, description: Highest non-yanked version. }
+        revoked:
+          oneOf:
+            - { $ref: '#/components/schemas/Withdrawal' }
+            - { type: 'null' }
+        versions:
+          type: array
+          description: Newest first.
+          items: { $ref: '#/components/schemas/IndexVersion' }
+    IndexMedia:
+      type: object
+      required: [url, sha256]
+      properties:
+        url: { type: string, format: uri }
+        sha256: { $ref: '#/components/schemas/Sha256' }
+        caption: { $ref: '#/components/schemas/Text' }
+    IndexVersion:
+      type: object
+      required: [version, ref, commit, filex, published_at, manifest, wasm, ui, permissions, languages, engines, security, yanked]
+      properties:
+        version: { type: string }
+        ref: { type: string, description: The tag. }
+        commit: { type: string, pattern: '^[0-9a-f]{40}$' }
+        filex: { type: string, description: 'The manifest''s filex range (`>=0.49.0`); empty = any.' }
+        published_at: { type: string, format: date }
+        manifest: { $ref: '#/components/schemas/IndexArtifact' }
+        wasm:
+          oneOf:
+            - { $ref: '#/components/schemas/IndexArtifact' }
+            - { type: 'null' }
+        ui:
+          oneOf:
+            - { $ref: '#/components/schemas/IndexArtifact' }
+            - { type: 'null' }
+        permissions:
+          type: array
+          items: { type: string }
+          description: |
+            filex's review list: the ids of the rows the validator's dry run answered (the rows the app's
+            page shows), each once, in their order - the manifest's declared permissions and the ones filex
+            derives from its `ui`, `thumbnails`, `encrypted_folders` and `co_edit` blocks (`ui:eval`,
+            `ui-viewer:.docx`, `files:e2e-plaintext`, `files:co-edit`, ...). A version kept without rows
+            lists its declared permissions; a storage plugin lists none. A filex shows this list in its store
+            and in the install request a person sends, so it is the list its install review will show.
+        languages:
+          type: array
+          items:
+            type: object
+            required: [code, percent]
+            properties:
+              code: { type: string }
+              percent: { type: integer, minimum: 0, maximum: 100 }
+        engines:
+          type: array
+          items: { type: string }
+        notes_url: { type: string, format: uri }
+        security: { type: boolean, description: The version fixes a security issue. }
+        yanked:
+          oneOf:
+            - { $ref: '#/components/schemas/Withdrawal' }
+            - { type: 'null' }
+        binaries:
+          type: object
+          description: |
+            A storage plugin's builds by platform (`linux/amd64`, `linux/arm64`, `windows/amd64`, ...), each
+            pinned and signed with the artifact key; absent for an app, whose entry keeps its bytes. `manifest`
+            is then the release's `filex-storage.json`, `wasm` and `ui` are null and `permissions` is empty.
+            A build's `sig` is NOT over its sha256 alone: it is ed25519 over the build's text
+            `filex-storage-build:v1`, the app's name, this version (no leading `v`), the platform key and the
+            lower-case sha256, joined by single line feeds with none at the end (filex 0.55
+            `plugin.VerifyBuild`; docs/ARCHITECTURE.md, Signatures and keys).
+          additionalProperties: { $ref: '#/components/schemas/IndexArtifact' }
+        conformance: { $ref: '#/components/schemas/Conformance' }
+    Conformance:
+      type: object
+      description: What the store's plugin validator measured of a storage plugin build, on its own platform, with no network.
+      required: [platform, filex, verified, passed, failed, skipped]
+      properties:
+        platform: { type: string, description: 'The build that ran (`linux/amd64`); the others are pinned and signed, not run.' }
+        filex: { type: string, description: The filex version whose checks ran. }
+        verified: { type: boolean, description: 'The plugin offered a selftest area, so the probes touched real data.' }
+        passed: { type: integer }
+        failed: { type: integer, description: 'Always 0 for a listed version: a failed check refuses the submission.' }
+        skipped: { type: integer, description: The optional capabilities the plugin did not declare. }
+        driver: { type: string, description: 'The storage driver it describes itself as (`plugin:<driver>` in filex).' }
+        capabilities:
+          type: array
+          description: The optional capabilities it declared and proved, sorted.
+          items: { type: string, enum: [copy, delete, mkdir, move, multipart, presign, range, set_mtime, watch, write] }
+    IndexArtifact:
+      type: object
+      required: [url, sha256, sig]
+      properties:
+        url: { type: string, format: uri }
+        sha256: { $ref: '#/components/schemas/Sha256' }
+        size: { type: integer }
+        sig: { type: string, description: 'Artifact key: ed25519 over the lower-hex sha256, lower-case hex (the `signature` filex takes).' }
+    Withdrawal:
+      type: object
+      required: [reason, at]
+      properties:
+        reason: { type: string }
+        at: { type: string, format: date-time }
+    IndexRelease:
+      type: object
+      required: [serial, generated_at, expires_at, sha256, key_id, reason]
+      properties:
+        serial: { type: integer }
+        generated_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        sha256: { $ref: '#/components/schemas/Sha256' }
+        key_id: { type: string }
+        reason: { type: string }
+
+    # -------------------------------------------------------- catalog
+    Category:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { $ref: '#/components/schemas/Text' }
+    PublisherRef:
+      type: object
+      required: [id, name, verified, official]
+      properties:
+        id: { $ref: '#/components/schemas/PublisherId' }
+        name: { type: string }
+        verified: { type: boolean }
+        official: { type: boolean }
+        avatar_url:
+          type: string
+          description: |
+            The publisher's avatar, mirrored by this store (/v1/media/<sha256>.<ext>), where the answer carries
+            it: an app's publisher in the catalog, on the app's page, in a publisher's app list and in
+            Administration > Apps. Absent when the publisher has none (a page draws the initial).
+    Publisher:
+      allOf:
+        - { $ref: '#/components/schemas/PublisherRef' }
+        - type: object
+          required: [github_owner, owner_type, status, created_at]
+          properties:
+            github_owner: { type: string }
+            owner_type: { type: string, enum: [User, Organization] }
+            homepage: { type: string }
+            status: { type: string, enum: [pending, active, suspended] }
+            status_reason: { type: string }
+            created_at: { type: string, format: date-time }
+            description: { type: string, description: 'The GitHub owner''s profile text when the publisher became active.' }
+            avatar_url: { type: string, description: 'The GitHub owner''s avatar, mirrored by this store (/v1/media/<sha256>.<ext>).' }
+    PublisherListItem:
+      allOf:
+        - { $ref: '#/components/schemas/PublisherRef' }
+        - type: object
+          required: [github_owner, owner_type, apps]
+          properties:
+            github_owner: { type: string, description: The bound GitHub account or organization's login. }
+            owner_type: { type: string, enum: [User, Organization] }
+            homepage: { type: string }
+            description: { type: string }
+            avatar_url: { type: string, description: 'Mirrored by this store (/v1/media/<sha256>.<ext>); absent when none.' }
+            apps: { type: integer, minimum: 0, description: The number of listed apps. }
+    PublisherPage:
+      type: object
+      required: [items, total, page, per_page]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PublisherListItem' }
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+    PublisherRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, github_owner]
+      properties:
+        id: { $ref: '#/components/schemas/PublisherId' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        github_owner: { type: string, description: A GitHub login (user or organization). }
+        homepage: { type: string, format: uri }
+    AppSummary:
+      type: object
+      required: [name, kind, label, publisher, categories, latest, updated_at]
+      properties:
+        name: { $ref: '#/components/schemas/AppName' }
+        kind: { $ref: '#/components/schemas/AppKind' }
+        label: { $ref: '#/components/schemas/Text' }
+        summary: { $ref: '#/components/schemas/Text' }
+        publisher: { $ref: '#/components/schemas/PublisherRef' }
+        categories:
+          type: array
+          items: { type: string }
+        icon_url: { type: string }
+        latest: { type: string }
+        compatible:
+          type: string
+          description: With `?filex=`, the newest non-yanked version whose range admits that filex.
+        updated_at: { type: string, format: date-time }
+        pricing: { $ref: '#/components/schemas/Pricing' }
+        matched_extensions:
+          type: array
+          description: |
+            A file-type search only: what the app does with each searched extension it names (one entry
+            per extension, `ext` set), then at most one entry with `any_file` for what it offers on every
+            file (no `ext`).
+          items: { $ref: '#/components/schemas/FileTypeUse' }
+    AppPage:
+      type: object
+      required: [items, total, page, per_page]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AppSummary' }
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+        file_types: { $ref: '#/components/schemas/FileTypeSearch' }
+    FileTypeUse:
+      type: object
+      description: |
+        What an app does with one kind of file: an extension, a media type its manifest names, or every
+        file (`any_file`).
+      required: [roles]
+      properties:
+        ext: { type: string, description: 'Lower-case, without the dot.' }
+        mime: { type: string, description: 'A media type the manifest names, exact or a family (`image/*`).' }
+        any_file: { type: boolean, description: 'The rule names no kind: filex offers it on every file.' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/FileTypeRole' }
+    FileTypeRole:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [open, create, thumbnail, action, inspect, convert]
+          description: |
+            Where the manifest names the kind: `open` a viewer (the app opens the file in place of filex's
+            preview), `create` a row of filex's New menu, `thumbnail` the thumbnails block, `action` a
+            file-menu action (hidden actions are not listed), `inspect` a section of the details panel. And
+            `convert`: the version's listing declares that it converts the kind into the kinds `to` (its
+            `conversions`, reviewed with the code, not read from the manifest), one entry per condition
+            (`needs_any`), the one that needs nothing first.
+        id: { type: string, description: 'The view''s or action''s id (a New-menu row: the view that opens it).' }
+        label: { $ref: '#/components/schemas/Text' }
+        engine:
+          type: string
+          description: 'Offered on this kind only while filex has this engine (`applies.engine_ext`; `office` is the ONLYOFFICE Document Server connected to filex).'
+        output: { type: string, enum: [sibling, version, none], description: 'An action: a new file beside the source, a new version of it, or nothing.' }
+        output_ext: { type: string, description: 'An action writing a new file: the extension its output name fixes (`{stem}.pdf`); absent when the new file keeps the source''s kind.' }
+        via_mime: { type: string, description: 'The manifest names a media type, and filex gives this extension that type.' }
+        to:
+          type: array
+          description: '`convert`: the extensions the kind converts into (lower-case, without the dot), in the order the listing first names them.'
+          items: { type: string }
+        needs_any:
+          type: array
+          description: '`convert`: the conversion works while the filex has every engine of any one of these sets (engine ids of the manifest''s `engines:<id>` permissions; `office` is the ONLYOFFICE Document Server connected to filex). Absent: it needs nothing else.'
+          items:
+            type: array
+            items: { type: string }
+    ConversionRow:
+      type: object
+      required: [from, roles]
+      description: One row of an app version's conversion table.
+      properties:
+        from:
+          type: array
+          description: Extensions that convert alike (an alias like `jpeg` beside `jpg`), lower-case, without the dot.
+          items: { type: string }
+        roles:
+          type: array
+          description: What they convert into, `convert` roles as a file-type search gives them.
+          items: { $ref: '#/components/schemas/FileTypeRole' }
+    FileTypeSearch:
+      type: object
+      required: [extensions, named, filex, builtin, engines, near]
+      properties:
+        extensions:
+          type: array
+          description: The kinds searched for, lower-case, without the dot, in the search's order.
+          items: { type: string }
+        named:
+          type: integer
+          description: How many of the `total` items name one of the kinds themselves; the rest are there only for what they offer on every file (they come after).
+        filex: { type: string, description: 'The filex release `builtin` describes (`0.53.0`).' }
+        builtin:
+          type: array
+          description: What filex does by itself, with no app, with each searched kind it handles; a kind it does nothing with is absent.
+          items: { $ref: '#/components/schemas/BuiltinFileType' }
+        engines:
+          type: array
+          description: Every engine a `builtin` capability needs.
+          items:
+            type: object
+            required: [id, label, kind]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              kind: { type: string, enum: [service, tool], description: '`service`: an administrator connects it (ONLYOFFICE, draw.io); `tool`: a program on the filex server (ffmpeg, 7-Zip).' }
+              setting: { type: string, description: 'Where a filex administrator turns it on or points filex at it.' }
+              in_image: { type: boolean, description: 'A tool filex''s own default Docker image carries.' }
+        near:
+          type: array
+          description: Other listed apps whose name, label or summary holds one of the extensions (at most 12, not among the items).
+          items: { $ref: '#/components/schemas/AppSummary' }
+    BuiltinFileType:
+      type: object
+      required: [ext, can]
+      properties:
+        ext: { type: string }
+        label: { type: string, description: 'What filex calls the kind, when it names it.' }
+        mime: { type: string, description: 'filex''s media type of the extension.' }
+        can:
+          type: array
+          items:
+            type: object
+            required: [do]
+            properties:
+              do: { type: string, enum: [preview, edit, play, thumbnail, browse, create] }
+              needs: { type: string, description: 'An engine (`engines`) without which filex does not do it; absent: a stock filex does.' }
+              via: { type: string, description: 'The part of filex that does it.' }
+    AdminApp:
+      allOf:
+        - { $ref: '#/components/schemas/AppSummary' }
+        - type: object
+          required: [status]
+          properties:
+            status: { type: string, enum: [listed, unlisted, revoked] }
+            revoked_at: { type: string, format: date-time, description: Only on a revoked app. }
+    AdminAppPage:
+      type: object
+      required: [items, total, page, per_page]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminApp' }
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+    AppDetail:
+      allOf:
+        - { $ref: '#/components/schemas/AppSummary' }
+        - type: object
+          required: [repo, status, screenshots, versions]
+          properties:
+            repo: { type: string }
+            homepage: { type: string }
+            license: { type: string }
+            status: { type: string, enum: [listed, unlisted, revoked] }
+            revoked:
+              oneOf:
+                - { $ref: '#/components/schemas/Withdrawal' }
+                - { type: 'null' }
+            description_html:
+              type: string
+              description: The consent file's Markdown, rendered and sanitized by the server (no script, no forms, no frames).
+            screenshots:
+              type: array
+              items: { $ref: '#/components/schemas/IndexMedia' }
+            versions:
+              type: array
+              items: { $ref: '#/components/schemas/VersionSummary' }
+    VersionSummary:
+      type: object
+      required: [version, ref, filex, published_at, security, yanked]
+      properties:
+        version: { type: string }
+        ref: { type: string }
+        filex: { type: string }
+        published_at: { type: string, format: date-time }
+        security: { type: boolean }
+        yanked:
+          oneOf:
+            - { $ref: '#/components/schemas/Withdrawal' }
+            - { type: 'null' }
+    VersionDetail:
+      allOf:
+        - { $ref: '#/components/schemas/VersionSummary' }
+        - type: object
+          required: [commit, manifest, permissions, languages, engines, install, file_types, conversions]
+          properties:
+            commit: { type: string }
+            manifest: { $ref: '#/components/schemas/IndexArtifact' }
+            wasm: { $ref: '#/components/schemas/IndexArtifact' }
+            ui: { $ref: '#/components/schemas/IndexArtifact' }
+            permissions:
+              type: array
+              items: { $ref: '#/components/schemas/PermissionRow' }
+            languages:
+              type: array
+              items:
+                type: object
+                properties:
+                  code: { type: string }
+                  percent: { type: integer }
+            engines:
+              type: array
+              items: { type: string }
+            notes_url: { type: string }
+            install:
+              type: object
+              description: What a person types into filex today (Admin, Plugins, Apps, Install an app, GitHub repository).
+              required: [github_repo, ref]
+              properties:
+                github_repo: { type: string }
+                ref: { type: string }
+            file_types:
+              type: array
+              description: The kinds of file this version works with, kind by kind (extensions in the manifest's order, then media types, then what it offers on every file); empty for a language pack. The conversions its listing declares are not here but in `conversions`.
+              items: { $ref: '#/components/schemas/FileTypeUse' }
+            conversions:
+              type: array
+              description: |
+                What the version converts, kind by kind, as its listing declares it (`.filex-apps.json`
+                `conversions`, reviewed with the code): every extension a conversion starts from, in the order the
+                listing first names it, with the extensions that convert alike on one row. Each row's `roles` are
+                what a file-type search for one of its extensions says (`convert` roles). Empty when it declares none.
+              items: { $ref: '#/components/schemas/ConversionRow' }
+            builds:
+              type: array
+              description: |
+                A storage plugin's builds, one per platform in the store's order (linux, windows, darwin; amd64
+                before arm64), each pinned and signed; absent for an app. `manifest` is then the release's
+                `filex-storage.json`.
+              items: { $ref: '#/components/schemas/BuildRow' }
+            conformance: { $ref: '#/components/schemas/Conformance' }
+    BuildRow:
+      allOf:
+        - { $ref: '#/components/schemas/IndexArtifact' }
+        - type: object
+          required: [platform]
+          properties:
+            platform: { type: string, description: '`os/arch`, as Go names them (`linux/amd64`).' }
+    PermissionRow:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { type: string, description: 'filex''s own words (the dry run''s label, English).' }
+        reason: { $ref: '#/components/schemas/Text' }
+
+    # -------------------------------------------------------- store
+    StoreInfo:
+      type: object
+      description: How the store presents itself. Every field but `name` is absent when not configured.
+      required: [name]
+      properties:
+        name: { type: string, description: '`FAPPS_STORE_NAME`; by default the host of the store''s public address.', examples: ['Acme Apps', 'apps.example.com'] }
+        logo_url: { type: string, description: 'The store''s own logo on its own origin (`FAPPS_STORE_LOGO`); absent: filex''s mark.', examples: ['/api/v1/store/logo?v=2f1c0a9b8e7d6c5b'] }
+        operator_name: { type: string, description: 'Who runs the store (`FAPPS_OPERATOR_NAME`).' }
+        operator_url: { type: string, format: uri, description: 'Their page (`FAPPS_OPERATOR_URL`, https).' }
+        contact: { type: string, format: uri, description: 'How to reach them (`FAPPS_CONTACT`): a `mailto:` or an https address.' }
+        terms_url: { type: string, format: uri, description: 'The terms of service (`FAPPS_TERMS_URL`, https).' }
+        privacy_url: { type: string, format: uri, description: 'The privacy policy (`FAPPS_PRIVACY_URL`, https).' }
+
+    # -------------------------------------------------------- me
+    Me:
+      type: object
+      required: [account, identity, roles, role_source, publishers, csrf_token, providers]
+      properties:
+        account:
+          type: object
+          required: [id, display_name]
+          properties:
+            id: { type: integer }
+            display_name: { type: string }
+            email: { type: string }
+        identity:
+          type: object
+          description: The identity this session signed in with (always GitHub).
+          required: [provider, login]
+          properties:
+            provider: { type: string, enum: [github] }
+            login: { type: string }
+        roles:
+          type: array
+          description: The store roles of this session, read at sign-in and fixed for its life.
+          items: { type: string, enum: [reviewer, admin] }
+        role_source:
+          type: string
+          description: |
+            Why the session holds `roles` (the same words the audit log keeps for the sign-in): what GitHub
+            said about the account's permission on the administration repository, e.g.
+            `github repo permission acme/store-admins: write`, or why it could not be asked, e.g.
+            `github repo permission acme/store-admins: not checked (FAPPS_ADMIN_TOKEN is not set)`; a list
+            that grants a role adds `; listed in FAPPS_ADMINS` (or `FAPPS_REVIEWERS`). A store without an
+            administration repository says `listed in FAPPS_ADMINS`, `listed in FAPPS_REVIEWERS` or
+            `not listed in FAPPS_ADMINS or FAPPS_REVIEWERS`.
+          examples: ['github repo permission acme/store-admins: write', 'github repo permission acme/store-admins: read; listed in FAPPS_ADMINS', 'listed in FAPPS_REVIEWERS']
+        publishers:
+          type: array
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/PublisherRef' }
+              - type: object
+                properties:
+                  role: { type: string, enum: [owner, maintainer] }
+                  status: { type: string, enum: [pending, active, suspended] }
+        csrf_token: { type: string }
+        providers: { $ref: '#/components/schemas/SignInProviders' }
+    SignInProviders:
+      type: object
+      description: Which sign-ins this server can start (configured; the identity provider may still be down).
+      required: [github]
+      properties:
+        github: { type: boolean, description: 'Everyone: GitHub (`/auth/github/login`).' }
+    SignedOut:
+      allOf:
+        - { $ref: '#/components/schemas/Error' }
+        - type: object
+          required: [providers]
+          properties:
+            providers: { $ref: '#/components/schemas/SignInProviders' }
+    AdminHealth:
+      type: object
+      required: [roles]
+      properties:
+        roles: { $ref: '#/components/schemas/RoleSourceHealth' }
+    RoleSourceHealth:
+      type: object
+      description: |
+        The role check: the server's token (`FAPPS_ADMIN_TOKEN`) asking GitHub about the administration
+        repository (`FAPPS_ADMIN_REPO`), and the lists `FAPPS_ADMINS` / `FAPPS_REVIEWERS`. `ok`: the
+        repository answered, or there is none and the lists alone decide. `unconfigured`: a repository
+        without a token (it grants no role; the lists still do), or neither a repository nor a list (nobody
+        gets a store role). `unchecked`: a token is set and GitHub has not been asked yet. `repo_unreachable`:
+        the token does not see the repository (a fine-grained token waiting for the organization's approval,
+        a wrong repository, revoked access). `failing`: GitHub refused the token or did not answer.
+      required: [repo, token_configured, status]
+      properties:
+        repo: { type: string, description: '`owner/name`; empty when no administration repository is configured.', examples: ['acme/store-admins'] }
+        token_configured: { type: boolean }
+        admins: { type: integer, description: 'How many accounts `FAPPS_ADMINS` names.' }
+        reviewers: { type: integer, description: 'How many accounts `FAPPS_REVIEWERS` names (an account on both lists counts as an administrator only).' }
+        status: { type: string, enum: [ok, unconfigured, unchecked, repo_unreachable, failing] }
+        message: { type: string, description: 'What is wrong, in a sentence; absent when `ok`.' }
+        checked_at: { type: string, format: date-time, description: 'The last time GitHub was asked.' }
+        last_ok_at: { type: string, format: date-time, description: 'The last time the repository answered.' }
+
+    # -------------------------------------------------------- submissions
+    SubmissionStatus:
+      type: string
+      enum: [queued, resolving, validating, needs_review, approved, rejected, failed, withdrawn]
+    SubmissionRequest:
+      type: object
+      additionalProperties: false
+      required: [publisher, repo, ref]
+      properties:
+        publisher: { $ref: '#/components/schemas/PublisherId' }
+        repo:
+          type: string
+          description: '`owner/name`, or a `https://github.com/owner/name` address (trimmed).'
+          maxLength: 300
+        ref:
+          type: string
+          description: A tag. A branch is refused (`not_a_tag`).
+          maxLength: 255
+        note:
+          type: string
+          maxLength: 4000
+          description: For the reviewer.
+        kind: { $ref: '#/components/schemas/SubmissionKind' }
+    SubmissionKind:
+      type: string
+      enum: [app, storage]
+      description: |
+        What is submitted (absent = `app`): `app` is an app or a language pack (`filex-app.json` at the tag),
+        `storage` a filex storage plugin (`filex-storage.json` attached to the tag's release, a build for
+        linux/amd64 and linux/arm64 at least). Both need `.filex-apps.json` at the tag.
+    Submission:
+      type: object
+      required: [id, publisher, repo, ref, status, attempt, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        kind: { $ref: '#/components/schemas/SubmissionKind' }
+        publisher: { $ref: '#/components/schemas/PublisherRef' }
+        app: { type: string, description: The app name once known. }
+        version: { type: string }
+        repo: { type: string }
+        ref: { type: string }
+        status: { $ref: '#/components/schemas/SubmissionStatus' }
+        attempt: { type: integer }
+        failure:
+          type: object
+          properties:
+            code:
+              type: string
+              description: |
+                The first failed check's code (see `Check.code`), or the pipeline's own: `resolve_error`,
+                `resolve_incomplete`, `resolver_unavailable`, `resolution_unreadable`, `dry_run_error`,
+                `validator_unavailable`.
+            message: { type: string }
+        submitted_by: { type: string, description: The submitter's GitHub login. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+    SubmissionPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Submission' }
+        total: { type: integer }
+    SubmissionDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Submission' }
+        - type: object
+          required: [checks, dry_runs, reviews]
+          properties:
+            note: { type: string }
+            resolution: { $ref: '#/components/schemas/Resolution' }
+            checks:
+              type: array
+              items: { $ref: '#/components/schemas/Check' }
+            dry_runs:
+              type: array
+              items: { $ref: '#/components/schemas/DryRunResult' }
+            reviews:
+              type: array
+              items: { $ref: '#/components/schemas/Review' }
+            diff:
+              type: object
+              description: Against the newest approved version of the same app (absent for a first version).
+              properties:
+                from: { type: string }
+                permissions_added:
+                  type: array
+                  items: { type: string }
+                permissions_removed:
+                  type: array
+                  items: { type: string }
+                filex_from: { type: string }
+                filex_to: { type: string }
+                module_changed: { type: boolean }
+                ui_changed: { type: boolean }
+    Resolution:
+      type: object
+      description: backend/internal/domain.Resolution.
+      properties:
+        repo_owner: { type: string }
+        repo_name: { type: string }
+        repo_id: { type: integer }
+        owner_id: { type: integer }
+        owner_type: { type: string }
+        ref: { type: string }
+        commit_sha: { type: string }
+        tag_verified: { type: boolean }
+        manifest_url: { type: string }
+        manifest_sha256: { type: string }
+        manifest: { type: object }
+        name: { type: string }
+        version: { type: string }
+        kind: { $ref: '#/components/schemas/AppKind' }
+        filex_range: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        homepage: { type: string }
+        license: { type: string }
+        wasm: { $ref: '#/components/schemas/ResolvedArtifact' }
+        ui: { $ref: '#/components/schemas/ResolvedArtifact' }
+        consent: { type: object, description: 'The `.filex-apps.json` (schema/filex-apps.schema.json), `conversions` included (held to the schema and to the manifest''s engines by the consent check).' }
+        description_md:
+          type: string
+          maxLength: 65536
+          description: The Markdown file the consent file names (`consent.description`), read at the commit; absent when it names none. Rendered and sanitized by the server for `AppDetail.description_html`.
+        binaries:
+          type: object
+          description: 'A storage plugin''s builds by platform, each downloaded and held to the feed''s sha256 (`kind: storage`; `manifest_url` is then the feed).'
+          additionalProperties: { $ref: '#/components/schemas/ResolvedArtifact' }
+        feed_notes: { type: string, description: 'A storage plugin feed''s `notes`, plain text, clipped to 8 KiB.' }
+    ResolvedArtifact:
+      type: object
+      required: [url, sha256, size]
+      properties:
+        url: { type: string }
+        sha256: { $ref: '#/components/schemas/Sha256' }
+        size: { type: integer }
+    Check:
+      type: object
+      required: [kind, status, started_at]
+      properties:
+        kind: { type: string, enum: [repo_access, tag, manifest, consent, policy, artifacts, media, dry_run] }
+        validator: { type: string }
+        status: { type: string, enum: [pending, running, passed, warned, failed, skipped] }
+        code:
+          type: string
+          description: |
+            Machine-readable reason of a failed, warned or skipped row. By check:
+            `repo_access`: repo_private, repo_archived, repo_permission, owner_mismatch;
+            `tag`: not_a_tag, tag_not_found;
+            `manifest`: manifest_missing, manifest_unreadable, too_large;
+            `consent`: consent_missing, consent_invalid, consent_publisher;
+            `policy`: name_taken, name_reserved, name_changed, repo_changed, publisher_changed, kind_changed, version_invalid,
+            version_exists, license_missing (failed), name_similar, version_backport (warned);
+            `artifacts`: sha256_mismatch, sha256_required, too_large, fetch_failed, host_not_allowed;
+            `media`: media_invalid, too_large;
+            `dry_run`: out_of_range (skipped), no_validator_in_range, range_invalid, incompatible,
+            kind_mismatch, manifest_sha256_mismatch, sha256_mismatch, permissions_mismatch, answer_incomplete,
+            and filex's own refusal codes kept verbatim (manifest_invalid, ...).
+            A storage plugin's submission (`kind: storage`) reads its feed on the `manifest` row (manifest_missing,
+            manifest_unreadable, platform_missing, platform_unknown, too_large), its builds on `artifacts` (also
+            build_not_native: a build that is not its platform's executable, ELF, PE or Mach-O), and its
+            `dry_run` on a plugin validator: no_build_for_platform, name_mismatch, version_mismatch, conformance_unverified,
+            conformance_failed, and filex's own (start_failed, handshake, describe_invalid, no_selftest, ...).
+        message: { type: string }
+        data: { type: object }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+    DryRunResult:
+      type: object
+      required: [validator, filex_version, ok, kind, manifest_sha256, permissions]
+      properties:
+        validator: { type: string }
+        filex_version: { type: string }
+        ok: { type: boolean }
+        code: { type: string, description: 'filex''s own refusal code kept verbatim, or one of the store''s dry_run codes (see `Check.code`).' }
+        message: { type: string }
+        kind: { $ref: '#/components/schemas/AppKind' }
+        manifest_sha256: { type: string }
+        wasm_sha256: { type: string }
+        ui_sha256: { type: string, description: The interface bundle's sha256 as this filex measured it. }
+        compat_ok: { type: boolean }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/PermissionRow' }
+        engines_missing:
+          type: array
+          items: { type: string }
+        languages:
+          type: array
+          description: This filex's coverage of each language the version speaks (differs between filex versions).
+          items: { $ref: '#/components/schemas/LanguageCoverage' }
+    LanguageCoverage:
+      type: object
+      required: [code, percent, keys, total]
+      properties:
+        code: { type: string }
+        percent: { type: integer, minimum: 0, maximum: 100 }
+        keys: { type: integer }
+        total: { type: integer }
+    Review:
+      type: object
+      required: [id, reviewer, decision, created_at]
+      properties:
+        id: { type: integer }
+        reviewer: { type: string }
+        decision: { type: string, enum: [approve, reject, comment] }
+        note: { type: string }
+        security: { type: boolean }
+        created_at: { type: string, format: date-time }
+    ApproveRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 8000 }
+        security: { type: boolean, default: false, description: The version fixes a security issue. }
+    ReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    # -------------------------------------------------------- admin
+    SigningKey:
+      type: object
+      required: [id, use, public_hex, status, demo, created_at]
+      properties:
+        id: { type: string }
+        use: { type: string, enum: [index, artifact, license] }
+        public_hex: { type: string }
+        status: { type: string, enum: [next, active, retired] }
+        demo: { type: boolean, description: 'A throw-away key the store generated itself (FAPPS_DEMO_KEYS=1, for the e2e stack and local development); no real filex trusts it.' }
+        created_at: { type: string, format: date-time }
+        activated_at: { type: string, format: date-time }
+        retired_at: { type: string, format: date-time }
+    ValidatorStatus:
+      type: object
+      required: [label, base_url, reachable]
+      properties:
+        label: { type: string }
+        base_url: { type: string }
+        reachable: { type: boolean }
+        filex_version: { type: string }
+        error: { type: string }
+    PluginValidatorStatus:
+      type: object
+      description: A `filex plugin-validator` the store hands storage plugin builds to, as its last heartbeat says.
+      required: [label, kind, reachable]
+      properties:
+        label: { type: string }
+        kind: { type: string, enum: [storage] }
+        reachable: { type: boolean, description: 'Its heartbeat is fresh (90 seconds).' }
+        filex_version: { type: string }
+        platform: { type: string, description: 'The platform whose builds it runs (`linux/amd64`).' }
+        error: { type: string }
+    AuditEntry:
+      type: object
+      required: [id, at, actor_role, action]
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        actor: { type: string }
+        actor_role: { type: string, enum: [anonymous, publisher, reviewer, admin, system] }
+        action: { type: string }
+        target_type: { type: string }
+        target_id: { type: string }
+        data: { type: object }
+
+    # -------------------------------------------------------- licensing
+    Pricing:
+      type: object
+      additionalProperties: false
+      description: An app's price, for display only (the store takes no payment). Absent on an app means free.
+      required: [model]
+      properties:
+        model: { type: string, enum: [free, paid] }
+        price_text: { type: string, minLength: 1, maxLength: 80, description: 'Only on a paid app, e.g. `$29 per instance`.' }
+        purchase_url: { type: string, format: uri, maxLength: 500, description: 'Only on a paid app; https only.' }
+    LicenseKey:
+      type: string
+      description: '`FXL-` and 26 Crockford base32 characters in groups of four (the last group two).'
+      pattern: '^FXL-[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){5}-[0-9A-HJKMNP-TV-Z]{2}$'
+      examples: ['FXL-7K2Q-9WXM-3HDF-0PZA-QRST-V8MN-4C']
+    InstanceId:
+      type: string
+      description: A filex instance's opaque id, as that filex gives it (printable ASCII, no space).
+      pattern: '^[!-~]{1,128}$'
+    License:
+      type: object
+      required: [id, app, key_prefix, licensee_name, seats, seats_used, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        app: { $ref: '#/components/schemas/AppName' }
+        key_prefix: { type: string, pattern: '^FXL-[0-9A-HJKMNP-TV-Z]{4}$', description: The key's first 8 characters. }
+        licensee_name: { type: string }
+        licensee_contact: { type: string, description: An e-mail address or a GitHub login. }
+        seats: { type: integer, minimum: 1 }
+        seats_used: { type: integer, minimum: 0, description: Activations not released. }
+        valid_until: { type: string, format: date, description: 'Valid through the end of this UTC day; absent = no end.' }
+        updates_until: { type: string, format: date, description: 'Updates through the end of this UTC day; absent = no end.' }
+        status: { type: string, enum: [active, revoked] }
+        note: { type: string }
+        created_by: { type: string, description: The creator's GitHub login. }
+        created_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time }
+    LicenseCreate:
+      type: object
+      additionalProperties: false
+      required: [licensee_name]
+      properties:
+        licensee_name: { type: string, minLength: 1, maxLength: 120 }
+        licensee_contact: { type: string, maxLength: 200, description: An e-mail address or a GitHub login. }
+        seats: { type: integer, minimum: 1, maximum: 100000, default: 1 }
+        valid_until: { type: string, format: date, description: Today or later (UTC). }
+        updates_until: { type: string, format: date, description: Today or later (UTC). }
+        note: { type: string, maxLength: 2000 }
+    LicenseCreated:
+      type: object
+      required: [license, key]
+      properties:
+        license: { $ref: '#/components/schemas/License' }
+        key: { $ref: '#/components/schemas/LicenseKey' }
+    LicensePage:
+      type: object
+      required: [items, total, page, per_page]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/License' }
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+    Activation:
+      type: object
+      required: [instance_id, first_seen, last_seen, active]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        first_seen: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time }
+        released_at: { type: string, format: date-time }
+        active: { type: boolean, description: Not released (counts against the seats). }
+        filex_version: { type: string, description: What the last check said. }
+    LicenseVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [key, app, instance_id]
+      properties:
+        key: { type: string, maxLength: 64, description: 'The license key as the person typed it (case, spaces and the `FXL-` prefix are forgiven).' }
+        app: { $ref: '#/components/schemas/AppName' }
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        filex_version: { type: string, maxLength: 64 }
+    LicenseVerdict:
+      type: object
+      description: |
+        The payload of a license check. `next_check_by` = `checked_at` + 24 hours, `grace_until` =
+        `checked_at` + 14 days (a filex that cannot reach the store keeps its last `valid` verdict until
+        then). `licensee`, `seats`, `seats_used`, `valid_until` and `updates_until` are present for a key of
+        this app (`valid`, `revoked`, `expired`, `seats_exhausted`) and absent for `invalid` and `wrong_app`;
+        `valid_until` / `updates_until` are absent when the license has no end.
+      required: [result, app, instance_id, checked_at, next_check_by, grace_until]
+      properties:
+        result: { type: string, enum: [valid, invalid, revoked, expired, seats_exhausted, wrong_app] }
+        app: { $ref: '#/components/schemas/AppName' }
+        licensee: { type: string }
+        seats: { type: integer }
+        seats_used: { type: integer }
+        valid_until: { type: string, format: date }
+        updates_until: { type: string, format: date }
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        checked_at: { type: string, format: date-time, description: 'RFC 3339, UTC, seconds.' }
+        next_check_by: { type: string, format: date-time }
+        grace_until: { type: string, format: date-time }
+    SignedEnvelope:
+      type: object
+      description: A signed answer; see the conventions at the top for the canonical bytes.
+      required: [payload, key_id, signature]
+      properties:
+        payload: { type: object }
+        key_id: { type: string }
+        signature: { type: string, pattern: '^[0-9a-f]{128}$' }
+    SignedLicenseVerdict:
+      allOf:
+        - { $ref: '#/components/schemas/SignedEnvelope' }
+        - type: object
+          properties:
+            payload: { $ref: '#/components/schemas/LicenseVerdict' }
+            key_id: { type: string, description: 'A `license` key of /v1/keys.json.' }
+
+    # -------------------------------------------------------- notifications
+    NotificationKind:
+      type: string
+      enum: [submission.approved, submission.rejected, filex.released, submission.app_new, submission.version_new, publisher.requested, pipeline.error]
+      description: |
+        `submission.approved` / `submission.rejected`: a submission of a publisher the account is a member of
+        was decided (the one who decided is not told). `filex.released`: the store knows a newer filex
+        release (from its own file-type data and its validators; it never asks GitHub), once per version.
+        For administrators: `submission.app_new` / `submission.version_new` (a submission passed its checks
+        and waits for review), `publisher.requested` (a publisher waits to be activated), `pipeline.error`
+        (the store could not check a submission: the validators or GitHub did not answer). An operator import
+        raises no review or decision event.
+    NotificationEventInfo:
+      type: object
+      required: [kind, admin]
+      properties:
+        kind: { $ref: '#/components/schemas/NotificationKind' }
+        admin: { type: boolean, description: Only administrators may choose it. }
+    NotificationEvents:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationKind' }
+    WebhookFormat:
+      type: string
+      enum: [generic, slack, discord, teams]
+    ChannelResult:
+      type: object
+      description: A channel's last delivery or test.
+      required: [status, at]
+      properties:
+        status: { type: string, enum: [delivered, failed] }
+        http_status: { type: integer, description: The receiver's answer; none when it did not answer. }
+        error: { type: string, description: Why it failed, without the address. }
+        at: { type: string, format: date-time }
+    DeliveryResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [delivered, failed] }
+        http_status: { type: integer }
+        error: { type: string }
+    Webhook:
+      type: object
+      required: [id, name, format, url_hint, signed, events, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        format: { $ref: '#/components/schemas/WebhookFormat' }
+        url_hint: { type: string, description: 'The address''s scheme and host, the rest cut ("https://hooks.slack.com/…").' }
+        header_name: { type: string, description: The receiver's own header (generic); its value is never shown. }
+        signed: { type: boolean, description: The body is signed (X-Fapps-Signature); the generic format. }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationKind' }
+        created_at: { type: string, format: date-time }
+        last: { $ref: '#/components/schemas/ChannelResult' }
+    WebhookCreate:
+      type: object
+      additionalProperties: false
+      required: [name, format, url, events]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        format: { $ref: '#/components/schemas/WebhookFormat' }
+        url: { type: string, maxLength: 2048 }
+        header_name: { type: string, maxLength: 64, description: 'An HTTP token; not Host, Content-Type, Cookie or X-Fapps-*.' }
+        header_value: { type: string, maxLength: 1024 }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationKind' }
+    WebhookCreated:
+      type: object
+      required: [webhook]
+      properties:
+        webhook: { $ref: '#/components/schemas/Webhook' }
+        secret: { type: string, description: 'The generic format''s signing secret ("whsec_..."), shown this once.' }
+    WebhookPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationKind' }
+    PushSubscription:
+      type: object
+      required: [id, endpoint_host, user_agent, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        endpoint_host: { type: string, description: The push service's host (fcm.googleapis.com, ...). }
+        user_agent: { type: string, description: The browser that subscribed. }
+        created_at: { type: string, format: date-time }
+        last: { $ref: '#/components/schemas/ChannelResult' }
+    PushSubscriptionCreate:
+      type: object
+      additionalProperties: false
+      required: [endpoint, keys]
+      properties:
+        endpoint: { type: string, maxLength: 2048 }
+        expirationTime: { type: [number, 'null'] }
+        keys:
+          type: object
+          additionalProperties: false
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string, maxLength: 200 }
+            auth: { type: string, maxLength: 64 }
+    NotificationSettings:
+      type: object
+      required: [events, formats, push, webhooks]
+      properties:
+        events:
+          type: array
+          description: The events the caller may choose (an administrator's include the administrators').
+          items: { $ref: '#/components/schemas/NotificationEventInfo' }
+        formats:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookFormat' }
+        push:
+          type: object
+          required: [available, events, browsers]
+          properties:
+            available: { type: boolean, description: The store has a VAPID key (browser notifications can be turned on). }
+            public_key: { type: string, description: The VAPID public key (base64url), the browser's applicationServerKey. }
+            events:
+              type: array
+              items: { $ref: '#/components/schemas/NotificationKind' }
+            browsers:
+              type: array
+              items: { $ref: '#/components/schemas/PushSubscription' }
+        webhooks:
+          type: array
+          items: { $ref: '#/components/schemas/Webhook' }
+
+    # -------------------------------------------------------- install
+    SavedInstance:
+      type: object
+      required: [id, label, url, created_at, connected]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        url: { type: string, description: The filex origin (scheme and host, no path). }
+        created_at: { type: string, format: date-time }
+        connected: { type: boolean, description: A filex server holds a key for this instance (Instance connections). }
+        key_fingerprint: { $ref: '#/components/schemas/Sha256' }
+        connected_at: { type: string, format: date-time }
+        last_request_at: { type: string, format: date-time, description: The connected filex's last signed request. }
+    ConnectCode:
+      type: object
+      required: [code, expires_at]
+      properties:
+        code: { type: string, pattern: '^fxc_[A-Za-z0-9_-]{43}$', description: Shown once. }
+        expires_at: { type: string, format: date-time }
+    InstanceConnectRequest:
+      type: object
+      required: [code, public_key, filex_origin]
+      properties:
+        code: { type: string, maxLength: 64 }
+        public_key: { type: string, pattern: '^[0-9a-f]{64}$', description: The filex's ed25519 public key, 32 bytes as lower-case hex. }
+        filex_origin: { type: string, maxLength: 300, description: The filex's own address; it must be the instance's. }
+        filex_instance_id: { $ref: '#/components/schemas/InstanceId' }
+    InstanceConnection:
+      type: object
+      description: The payload of `POST /v1/instances/connect`, signed with an `index` key.
+      required: [store, instance_id, filex_origin, key_fingerprint, connected_at]
+      properties:
+        store: { type: string }
+        instance_id: { type: string, format: uuid }
+        filex_origin: { type: string }
+        key_fingerprint: { $ref: '#/components/schemas/Sha256' }
+        connected_at: { type: string, format: date-time, description: 'RFC 3339, UTC, seconds.' }
+    SignedInstanceConnection:
+      allOf:
+        - { $ref: '#/components/schemas/SignedEnvelope' }
+        - type: object
+          properties:
+            payload: { $ref: '#/components/schemas/InstanceConnection' }
+            key_id: { type: string, description: 'An `index` key.' }
+    InstanceConnectionView:
+      type: object
+      required: [instance_id, filex_origin, key_fingerprint, connected_at]
+      properties:
+        instance_id: { type: string, format: uuid }
+        filex_origin: { type: string }
+        key_fingerprint: { $ref: '#/components/schemas/Sha256' }
+        connected_at: { type: string, format: date-time }
+    InstanceIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [app]
+      properties:
+        app: { $ref: '#/components/schemas/AppName' }
+        version: { type: string, maxLength: 64 }
+        license_key: { type: string, maxLength: 64 }
+    InstanceIntentCreated:
+      type: object
+      required: [token, token_id, expires_at, app, version]
+      properties:
+        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        token_id: { type: string, pattern: '^[0-9a-f]{16}$' }
+        expires_at: { type: string, format: date-time }
+        app: { $ref: '#/components/schemas/AppName' }
+        version: { type: string }
+    SavedInstanceCreate:
+      type: object
+      additionalProperties: false
+      required: [url]
+      properties:
+        url: { type: string, maxLength: 300 }
+        label: { type: string, maxLength: 80, description: 'Defaults to the host.' }
+    InstallIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [app]
+      properties:
+        app: { $ref: '#/components/schemas/AppName' }
+        version: { type: string, maxLength: 64 }
+        filex_url: { type: string, maxLength: 300, description: 'The target filex''s address (https; normalized to its origin, no path).' }
+        instance_id: { type: string, format: uuid, description: A saved instance's id (`GET /api/v1/me/instances`) instead of `filex_url`. }
+        save_instance: { type: boolean, default: false, description: Also save `filex_url` as an instance. }
+        instance_label: { type: string, maxLength: 80 }
+        license_key: { type: string, maxLength: 64 }
+    InstallIntentCreated:
+      type: object
+      required: [token, magic_link, expires_at, app, version]
+      properties:
+        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        magic_link: { type: string, description: '`<filex origin>/admin/store-install#store=<encodeURIComponent(store origin)>&intent=<token>`' }
+        expires_at: { type: string, format: date-time }
+        app: { $ref: '#/components/schemas/AppName' }
+        version: { type: string }
+        instance: { $ref: '#/components/schemas/SavedInstance' }
+    InstallIntentPayload:
+      type: object
+      description: |
+        The payload of `GET /v1/install/{token}`, signed with an `index` key. The hashes, permissions and
+        range are the approved version's (the same as the index); `commit` is the commit the tag pointed to
+        at approval and, like `manifest_sha256`, is always set; `paid` is the app's price model;
+        `license_key` only when the person added one to the intent. `filex_origin` is the filex the intent
+        was made for (the magic link's origin): a filex refuses an intent whose `filex_origin` is not its own
+        address, so a leaked link cannot be used on another filex.
+      required: [store, filex_origin, token_id, app, kind, version, repo, ref, commit, manifest_sha256, permissions, filex_range, paid, expires_at]
+      properties:
+        store: { type: string, description: 'The store''s origin, e.g. https://apps.example.com.' }
+        filex_origin:
+          type: string
+          description: |
+            The target filex's origin as the store normalized it: scheme, lower-cased host and a port only when
+            it is not the scheme's default, no path and no trailing `/` (e.g. `https://files.example.com`); a
+            saved instance's address when the intent named one. The same value starts the magic link.
+        token_id: { type: string, pattern: '^[0-9a-f]{16}$', description: The intent's short id (not a hash of the token). }
+        app: { $ref: '#/components/schemas/AppName' }
+        kind: { $ref: '#/components/schemas/AppKind' }
+        version: { type: string }
+        repo: { type: string, description: '`owner/name` on GitHub.' }
+        ref: { type: string, description: The tag. }
+        commit: { type: string, pattern: '^[0-9a-f]{40}$' }
+        manifest_sha256: { $ref: '#/components/schemas/Sha256' }
+        wasm_sha256: { $ref: '#/components/schemas/Sha256' }
+        ui_sha256: { $ref: '#/components/schemas/Sha256' }
+        permissions:
+          type: array
+          items: { type: string }
+        filex_range: { type: string, description: 'Empty = any.' }
+        paid: { type: boolean }
+        license_key: { $ref: '#/components/schemas/LicenseKey' }
+        expires_at: { type: string, format: date-time, description: 'RFC 3339, UTC, seconds.' }
+        feed_url:
+          type: string
+          format: uri
+          description: '`kind: storage` only: the release''s `filex-storage.json`, whose SHA-256 is `manifest_sha256`.'
+        binaries:
+          type: object
+          description: '`kind: storage` only: every build by platform, pinned and signed with the artifact key.'
+          additionalProperties: { $ref: '#/components/schemas/IndexArtifact' }
+        conformance: { $ref: '#/components/schemas/Conformance' }
+    SignedInstallIntent:
+      allOf:
+        - { $ref: '#/components/schemas/SignedEnvelope' }
+        - type: object
+          properties:
+            payload: { $ref: '#/components/schemas/InstallIntentPayload' }
+            key_id: { type: string, description: 'An `index` key.' }
+    InstallIntentComplete:
+      type: object
+      additionalProperties: false
+      required: [instance_id, result]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        result: { type: string, enum: [installed, cancelled] }

@@ -1,0 +1,44 @@
+[
+  {
+    "owner": "e2e-pub-chromium", "owner_id": 910101, "repo": "hello", "id": 920101,
+    "license": "MIT", "roles": { "e2e-pub-chromium": "admin", "e2e-outsider": "write" },
+    "template": "hello-ui", "tags": ["v1.0.0", "v1.1.0"],
+    "vars": { "NAME": "e2e-hello-chromium", "PUBLISHER": "e2e-chromium", "VARIANT": "Chromium" }
+  },
+  {
+    "owner": "e2e-pub-firefox", "owner_id": 910102, "repo": "hello", "id": 920102,
+    "license": "MIT", "roles": { "e2e-pub-firefox": "admin", "e2e-outsider": "write" },
+    "template": "hello-ui", "tags": ["v1.0.0", "v1.1.0"],
+    "vars": { "NAME": "e2e-hello-firefox", "PUBLISHER": "e2e-firefox", "VARIANT": "Firefox" }
+  },
+  {
+    "owner": "e2e-pub-webkit", "owner_id": 910103, "repo": "hello", "id": 920103,
+    "license": "MIT", "roles": { "e2e-pub-webkit": "admin", "e2e-outsider": "write" },
+    "template": "hello-ui", "tags": ["v1.0.0", "v1.1.0"],
+    "vars": { "NAME": "e2e-hello-webkit", "PUBLISHER": "e2e-webkit", "VARIANT": "WebKit" }
+  },
+  {
+    "owner": "e2e-pub-chromium", "owner_id": 910101, "repo": "lang-e2e", "id": 920111,
+    "license": "MIT", "roles": { "e2e-pub-chromium": "admin" },
+    "template": "lang-pack", "tags": ["v0.1.0"], "lightweight": ["v0.1.0"],
+    "vars": { "NAME": "lang-e2e-chromium", "PUBLISHER": "e2e-chromium", "VARIANT": "Chromium" }
+  },
+  {
+    "owner": "e2e-pub-firefox", "owner_id": 910102, "repo": "lang-e2e", "id": 920112,
+    "license": "MIT", "roles": { "e2e-pub-firefox": "admin" },
+    "template": "lang-pack", "tags": ["v0.1.0"], "lightweight": ["v0.1.0"],
+    "vars": { "NAME": "lang-e2e-firefox", "PUBLISHER": "e2e-firefox", "VARIANT": "Firefox" }
+  },
+  {
+    "owner": "e2e-pub-webkit", "owner_id": 910103, "repo": "lang-e2e", "id": 920113,
+    "license": "MIT", "roles": { "e2e-pub-webkit": "admin" },
+    "template": "lang-pack", "tags": ["v0.1.0"], "lightweight": ["v0.1.0"],
+    "vars": { "NAME": "lang-e2e-webkit", "PUBLISHER": "e2e-webkit", "VARIANT": "WebKit" }
+  },
+  {
+    "owner": "e2e-org", "owner_id": 930001, "owner_type": "Organization", "repo": "store-admins", "id": 930101,
+    "private": true, "server_token": true,
+    "roles": { "e2e-admin": "write", "e2e-reviewer": "triage", "e2e-nobody": "read" },
+    "template": "", "tags": []
+  }
+]

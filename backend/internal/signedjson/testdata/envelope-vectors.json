@@ -1,0 +1,82 @@
+{
+  "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "public_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  "cases": [
+    {
+      "payload": {
+        "result": "valid",
+        "app": "filex-sign",
+        "licensee": "Zoë Ångström & Co <legal@example.com>",
+        "seats": 3,
+        "seats_used": 1,
+        "valid_until": "2027-10-04",
+        "instance_id": "inst-01HZ/x:y",
+        "checked_at": "2026-10-04T12:00:00Z",
+        "next_check_by": "2026-10-05T12:00:00Z",
+        "grace_until": "2026-10-18T12:00:00Z"
+      },
+      "canonical": "{\"app\":\"filex-sign\",\"checked_at\":\"2026-10-04T12:00:00Z\",\"grace_until\":\"2026-10-18T12:00:00Z\",\"instance_id\":\"inst-01HZ/x:y\",\"licensee\":\"Zoë Ångström & Co <legal@example.com>\",\"next_check_by\":\"2026-10-05T12:00:00Z\",\"result\":\"valid\",\"seats\":3,\"seats_used\":1,\"valid_until\":\"2027-10-04\"}",
+      "sha256": "29042e92fae8b9d826d977794f9e270694b87ad4a1a50c794b2081718b597212",
+      "signature": "826de19fde9e695c61169e4c1fcd6f01f891786b7bfbb3718f96213d7b8bd165be05ae2780dfda085b9991afdb52c33db7be0adb20af06cfc3e4527e059b5a06"
+    },
+    {
+      "payload": {
+        "result": "invalid",
+        "app": "hello",
+        "instance_id": "a",
+        "checked_at": "2026-10-04T12:00:00Z",
+        "next_check_by": "2026-10-05T12:00:00Z",
+        "grace_until": "2026-10-18T12:00:00Z"
+      },
+      "canonical": "{\"app\":\"hello\",\"checked_at\":\"2026-10-04T12:00:00Z\",\"grace_until\":\"2026-10-18T12:00:00Z\",\"instance_id\":\"a\",\"next_check_by\":\"2026-10-05T12:00:00Z\",\"result\":\"invalid\"}",
+      "sha256": "d2057ed9150aa86bcc05c351ebd800f810f55bb3f848d6252b0d451de1dbbfa3",
+      "signature": "05e73094bc897b26f71fa9b8bdf91e3a84e7661bd5810096d4a1e12776708c5fc3d6830eb9f3a888a37bf2262591cf312448c42dc21b7071978578a6aa114207"
+    },
+    {
+      "payload": {
+        "store": "https://apps.example.com",
+        "filex_origin": "https://files.example.com:8443",
+        "token_id": "0123456789abcdef",
+        "app": "filex-drawio",
+        "kind": "app",
+        "version": "31.5.3",
+        "repo": "BRF-Tech/filex-drawio",
+        "ref": "v31.5.3",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ui_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "permissions": [
+          "files:read",
+          "files:write"
+        ],
+        "filex_range": ">=0.50.0 <0.60.0",
+        "paid": true,
+        "license_key": "FXL-7K2Q-9WXM-3HDF-0PZA-QRST-V8MN-4C",
+        "expires_at": "2026-10-04T12:30:00Z"
+      },
+      "canonical": "{\"app\":\"filex-drawio\",\"commit\":\"cccccccccccccccccccccccccccccccccccccccc\",\"expires_at\":\"2026-10-04T12:30:00Z\",\"filex_origin\":\"https://files.example.com:8443\",\"filex_range\":\">=0.50.0 <0.60.0\",\"kind\":\"app\",\"license_key\":\"FXL-7K2Q-9WXM-3HDF-0PZA-QRST-V8MN-4C\",\"manifest_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"paid\":true,\"permissions\":[\"files:read\",\"files:write\"],\"ref\":\"v31.5.3\",\"repo\":\"BRF-Tech/filex-drawio\",\"store\":\"https://apps.example.com\",\"token_id\":\"0123456789abcdef\",\"ui_sha256\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"version\":\"31.5.3\"}",
+      "sha256": "4fc8e99ff2484fe68689ce436ca2172041bf63d2571c64e7d9d01ff714ddb789",
+      "signature": "95bf511eaf0ec2c4af54ee630744ab8bc95aaafc5571a1f6fe630cd04fe71f795808044f7c4572ff993a2cb84fc4f666706e8f87179bd33c4f345eb1b7406109"
+    },
+    {
+      "payload": {
+        "quote": "a \"b\" \\ c / d",
+        "emoji": "ünïcödé 😀 日本",
+        "empty": [],
+        "nested": {
+          "z": [
+            1,
+            {
+              "b": false,
+              "a": null
+            }
+          ],
+          "A": 0
+        }
+      },
+      "canonical": "{\"emoji\":\"ünïcödé 😀 日本\",\"empty\":[],\"nested\":{\"A\":0,\"z\":[1,{\"a\":null,\"b\":false}]},\"quote\":\"a \\\"b\\\" \\\\ c / d\"}",
+      "sha256": "3df4c3dda9c1352e5952c31c615fd0c48d4471129844455f2ee3f17c0a8f62ed",
+      "signature": "659766a209ed0c38da9adc9132604d0457fae8af65fd77be07868eb3be930167133250937d84a6e596265308e9196b17343a40ae669dc61f616e844f23fb2c0b"
+    }
+  ]
+}

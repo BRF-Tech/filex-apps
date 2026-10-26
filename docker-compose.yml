@@ -1,0 +1,105 @@
+# filex app store - the store and its validators: the base of the end-to-end
+# stack (docker-compose.e2e.yml adds Postgres, Redis, the mocks and the HTTPS
+# edge). A production store has its own compose file with its database, its
+# reverse proxy and its secrets.
+#
+# - This file opens no database, publishes no port and defines NO network of
+#   its own (it fits a host whose address pools are scarce - every custom
+#   network costs one); DATABASE_URL and REDIS_URL come from the
+#   environment.
+# - Compose reads the env files for interpolation, so ${FAPPS_*} below come
+#   from .env.example (non-secret) and the files loaded after it.
+# - filex-latest / filex-floor are the validators: real filex instances the
+#   store asks for the install review (dry run). They hold no data (tmpfs),
+#   have no ingress and sit on this project's default network only, which
+#   only `app` shares.
+# - plugin-latest is the storage plugin validator (filex 0.55+ `filex
+#   plugin-validator`): no network at all, it meets the store only through
+#   the plugin-spool volume (docs/DEPLOY.md "The plugin validator", the
+#   same block as production).
+# - The validators' image lines move with each filex release (docs/DEPLOY.md
+#   "Validators"): latest = the newest filex release, floor = the previous
+#   minor, plugin-latest = filex-latest's image.
+services:
+  app:
+    build:
+      context: .
+      args:
+        VERSION: demo
+    restart: unless-stopped
+    depends_on:
+      - filex-latest
+      - filex-floor
+      - plugin-latest
+    environment:
+      FAPPS_PLUGIN_VALIDATORS: plugins=/spool/latest
+    volumes:
+      - plugin-spool:/spool/latest
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  filex-latest:
+    image: ghcr.io/brf-tech/filex:v0.57.3
+    restart: unless-stopped
+    environment:
+      FILEX_ADMIN_EMAIL: ${FAPPS_VALIDATOR_EMAIL:-validator@local}
+      FILEX_ADMIN_PASSWORD: ${FAPPS_VALIDATOR_PASSWORD:?FAPPS_VALIDATOR_PASSWORD must be set}
+      FILEX_PLUGINS_DISABLED: "1"
+      FILEX_APP_PLUGINS_DISABLED: "0"
+    tmpfs:
+      - /data
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  filex-floor:
+    image: ghcr.io/brf-tech/filex:v0.56.0
+    restart: unless-stopped
+    environment:
+      FILEX_ADMIN_EMAIL: ${FAPPS_VALIDATOR_EMAIL:-validator@local}
+      FILEX_ADMIN_PASSWORD: ${FAPPS_VALIDATOR_PASSWORD:?FAPPS_VALIDATOR_PASSWORD must be set}
+      FILEX_PLUGINS_DISABLED: "1"
+      FILEX_APP_PLUGINS_DISABLED: "0"
+    tmpfs:
+      - /data
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  # The storage plugin validator (filex 0.55+), as production runs it:
+  # no network, the build comes in and the result goes out through
+  # plugin-spool; --work-dir /work (an exec 0711 tmpfs) and a noexec /tmp,
+  # without which 0.55's validator does not start. The image's own
+  # healthcheck asks 127.0.0.1:5212/healthz, which this mode does not serve:
+  # health is the heartbeat (status.json, every few seconds) instead.
+  plugin-latest:
+    image: ghcr.io/brf-tech/filex:v0.57.3
+    command: ["plugin-validator", "--spool", "/spool", "--work-dir", "/work", "--store-uid", "65532",
+              "--plugin-uid", "65534", "--plugin-gid", "65534"]
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /work:exec,mode=0711,size=1g
+      - /tmp:mode=1777,size=256m
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    cpus: 1.0
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /spool/status.json) )) -lt 60"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - plugin-spool:/spool
+
+volumes:
+  plugin-spool:

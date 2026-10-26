@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# pre-push: nothing reaches the remote unless the pushed commit passes
+#   1. gitleaks over the commits being pushed (.githooks/gitleaks.toml),
+#   2. scripts/checks/go.sh: gofmt, go vet, go build, go test of backend/,
+#   3. scripts/checks/web.sh: pnpm install, gen:api (a stale schema.d.ts is
+#      reported), pnpm build against the regenerated contract, exactly as the
+#      image builds it, and the unit tests.
+#
+# The checks run in Docker, never on the host itself. The pushed commit is
+# cloned from a git bundle into a named volume (nothing of the working tree
+# is mounted), then gitleaks, go.sh and web.sh run in it one container at a
+# time; the Go module, Go build and pnpm caches are named volumes that stay
+# (fapps-prepush-gomod, -gocache, -pnpm), the commit's own volume goes.
+#
+# Where (FAPPS_PREPUSH_HOST):
+#   local (the default)  this machine's Docker (whatever `docker` talks to)
+#   ssh:<host>           the Docker daemon of <host>, through DOCKER_HOST=ssh://<host>:
+#                        the same containers and volumes, on that machine
+#
+# Limits per container: FAPPS_PREPUSH_CPUS (default 3) and FAPPS_PREPUSH_MEMORY
+# (default 8g). Images: GO_IMAGE (golang:1.25), NODE_IMAGE
+# (node:22-bookworm-slim), GITLEAKS_IMAGE (ghcr.io/gitleaks/gitleaks:v8.28.0).
+#
+# Install: bash .githooks/install.sh. There is no skip switch in this script.
+set -euo pipefail
+
+mode=${FAPPS_PREPUSH_HOST:-local}
+remote_name=${1:-origin}
+zero=0000000000000000000000000000000000000000
+
+say() { printf 'pre-push: %s\n' "$*" >&2; }
+
+case "$mode" in
+  local) where="this machine's Docker" ;;
+  ssh:?*)
+    target=${mode#ssh:}
+    case "$target" in
+      *[!A-Za-z0-9@._-]*) say "FAPPS_PREPUSH_HOST=ssh:<host>: '$target' is not a host name"; exit 1 ;;
+    esac
+    export DOCKER_HOST="ssh://$target"
+    where="the Docker of $target"
+    ;;
+  *) say "FAPPS_PREPUSH_HOST must be local (the default) or ssh:<host>, not '$mode'"; exit 1 ;;
+esac
+
+# dockerq runs docker with Git Bash's path translation off: its arguments
+# (/r/src, the volume paths) are container paths, never this machine's.
+dockerq() { MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker "$@"; }
+
+check() {
+  local local_ref=$1 local_sha=$2 range=$3
+  local id=fapps-prepush-${local_sha:0:10}-$$
+  local go_image=${GO_IMAGE:-golang:1.25}
+  local node_image=${NODE_IMAGE:-node:22-bookworm-slim}
+  local leaks_image=${GITLEAKS_IMAGE:-ghcr.io/gitleaks/gitleaks:v8.28.0}
+  local lim=(--cpus "${FAPPS_PREPUSH_CPUS:-3}" --memory "${FAPPS_PREPUSH_MEMORY:-8g}")
+  local rc=0 v
+
+  if [ "$(git rev-parse --verify -q "$local_ref^{commit}" 2>/dev/null)" != "$local_sha" ]; then
+    say "$local_ref does not point at $local_sha; push a ref (branch or HEAD), not a bare commit"
+    return 1
+  fi
+  say "$local_ref ${local_sha:0:10}: checking $range on $where (volume $id)"
+  for v in "$id" fapps-prepush-gomod fapps-prepush-gocache fapps-prepush-pnpm; do
+    dockerq volume create "$v" >/dev/null || return 1
+  done
+  git bundle create - "$local_ref" 2>/dev/null |
+    dockerq run -i --rm --name "$id-clone" "${lim[@]}" -v "$id:/r" "$go_image" bash -ec "
+      cat > /r/repo.bundle
+      git -c advice.detachedHead=false -c init.defaultBranch=main clone -q /r/repo.bundle /r/src
+      git -C /r/src -c advice.detachedHead=false checkout -q --detach $local_sha
+      rm /r/repo.bundle
+      test -f /r/src/scripts/checks/go.sh && test -f /r/src/scripts/checks/web.sh" >&2 || {
+    say "could not check the commit out in volume $id (or it has no scripts/checks)"
+    rc=1
+  }
+  if [ "$rc" = 0 ]; then
+    echo "== gitleaks: commits $range" >&2
+    dockerq run --rm --name "$id-gitleaks" "${lim[@]}" -v "$id:/r" -w /r/src \
+      -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+      "$leaks_image" git --no-banner --redact --verbose --exit-code 1 \
+      --config /r/src/.githooks/gitleaks.toml --log-opts="$range" /r/src >&2 || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    dockerq run --rm --name "$id-go" "${lim[@]}" -v "$id:/r" \
+      -v fapps-prepush-gomod:/go/pkg/mod -v fapps-prepush-gocache:/root/.cache/go-build \
+      -e GOFLAGS=-buildvcs=false -w /r/src/backend "$go_image" bash /r/src/scripts/checks/go.sh >&2 || rc=1
+  fi
+  if [ "$rc" = 0 ]; then
+    dockerq run --rm --name "$id-web" "${lim[@]}" -v "$id:/r" -v fapps-prepush-pnpm:/pnpm-store \
+      -w /r/src/web "$node_image" bash /r/src/scripts/checks/web.sh >&2 || rc=1
+  fi
+  dockerq volume rm -f "$id" >/dev/null 2>&1 || true
+  if [ "$rc" = 0 ]; then
+    say "$local_ref ${local_sha:0:10}: all checks passed ($where)"
+  else
+    say "$local_ref ${local_sha:0:10}: CHECKS FAILED ($where)"
+  fi
+  return "$rc"
+}
+
+check_one() {
+  local local_ref=$1 local_sha=$2 remote_sha=$3
+  local base range
+
+  if [ "$remote_sha" != "$zero" ] && git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    base=$remote_sha
+  else
+    base=$(git merge-base "$local_sha" "refs/remotes/$remote_name/main" 2>/dev/null || true)
+  fi
+  if [ -n "$base" ]; then range="$base..$local_sha"; else range=$local_sha; fi
+  if [ -n "$base" ] && [ "$base" = "$local_sha" ]; then
+    say "$local_ref: nothing new to check"
+    return 0
+  fi
+  check "$local_ref" "$local_sha" "$range"
+}
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_sha:-}" ] || continue
+  if [ "$local_sha" = "$zero" ]; then
+    say "$remote_ref: deletion, nothing to check"
+    continue
+  fi
+  check_one "$local_ref" "$local_sha" "$remote_sha" || status=1
+done
+exit "$status"

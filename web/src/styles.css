@@ -1,0 +1,2630 @@
+/* The store's own layout and look. Every colour is a filex token (--fe-*) or
+ * a mix of tokens (color-mix), so the store follows filex's palette in light
+ * and dark (`html.dark`, see src/lib/theme.ts); nothing here defines a colour
+ * of its own (tests/guards.test.ts refuses one). Tables are filex's
+ * DataTable and bring their own styles.
+ *
+ * The look follows filex's own public face (filex.sh): the product blue, a
+ * soft blue glow behind the first band of a page, bordered cards that lift on
+ * hover, 12 px radii, pill badges. */
+:root {
+  /* A tone per app (its icon placeholder, the glow of a featured card): the
+   * file-type accents filex already ships, so a placeholder sits beside a
+   * real file icon without a colour filex does not know. */
+  --fa-tone: var(--fe-primary);
+  --fa-ring: color-mix(in srgb, var(--fe-primary) 28%, transparent);
+  --fa-glow: color-mix(in srgb, var(--fe-primary) 14%, transparent);
+  --fa-card-hover: color-mix(in srgb, var(--fe-primary) 34%, var(--fe-border));
+  /* Secondary text on a tinted ground (the glow of a first band, a callout,
+   * the current step): the muted grey reads 4.8:1 on the plain ground but
+   * drops under 4.5 on a tint (axe measured 4.35 in a danger callout), so
+   * there it leans toward the main text colour. */
+  --fa-text-soft: color-mix(in srgb, var(--fe-text) 70%, var(--fe-text-muted));
+  --fa-radius-xl: 16px;
+  --fa-gutter: 16px;
+  /* Depth. In light, soft shadows mixed from the text colour; in dark,
+   * filex's own shadows (near-black) and cards a step above the ground,
+   * because a shadow does not show on a dark page. */
+  --fa-shadow-1: 0 1px 2px color-mix(in srgb, var(--fe-text) 7%, transparent), 0 1px 1px color-mix(in srgb, var(--fe-text) 3%, transparent);
+  --fa-shadow-2: 0 2px 4px color-mix(in srgb, var(--fe-text) 5%, transparent), 0 14px 32px -12px color-mix(in srgb, var(--fe-text) 24%, transparent);
+  --fa-card: var(--fe-bg);
+  --fa-soft: var(--fe-bg-elev);
+  --fa-dots: color-mix(in srgb, var(--fe-text) 9%, transparent);
+}
+:root.dark {
+  --fa-shadow-1: var(--fe-shadow-sm);
+  --fa-shadow-2: var(--fe-shadow);
+  --fa-card: var(--fe-bg-elev);
+  --fa-soft: var(--fe-bg);
+  --fa-dots: color-mix(in srgb, var(--fe-text) 7%, transparent);
+}
+@media (min-width: 720px) {
+  :root {
+    --fa-gutter: 24px;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  font-family: var(--fe-font);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv05', 'ss01';
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The footer stays at the bottom of a short page. */
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+#app > .fa-main {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+a {
+  color: var(--fe-primary-ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a.fe-btn {
+  text-decoration: none;
+}
+a.fe-btn--primary {
+  color: var(--fe-text-on-primary);
+}
+/* A sign-in this server has not set up: the button stays, says why beside
+ * it, and leads nowhere. */
+.fa-btn-off {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fe-btn {
+  min-height: var(--fe-h-md);
+  justify-content: center;
+}
+.fe-btn--sm {
+  min-height: var(--fe-h-sm);
+}
+.fe-btn--lg {
+  min-height: var(--fe-h-lg);
+  padding: 8px 16px;
+  font-weight: 600;
+  border-radius: var(--fe-radius);
+}
+.fe-btn svg {
+  flex: 0 0 auto;
+}
+
+:focus-visible {
+  outline: 2px solid var(--fe-primary);
+  outline-offset: 2px;
+}
+/* Every movement here is decoration: someone who asked their system for
+ * less motion gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+h2 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+h1:focus {
+  outline: none;
+}
+
+.fa-skip {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: -48px;
+  padding: 8px 12px;
+  background: var(--fe-bg-elev);
+  border: 1px solid var(--fe-border-strong);
+  border-radius: var(--fe-radius-sm);
+  z-index: 50;
+}
+.fa-skip:focus {
+  top: 8px;
+}
+
+.fa-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.fa-muted {
+  color: var(--fe-text-muted);
+}
+
+/* ---------- shell ---------- */
+.fa-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--fa-gutter);
+  min-width: 0;
+}
+.fa-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--fe-bg) 86%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--fe-border-soft);
+}
+.fa-topbar__inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  min-height: 60px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.fa-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fe-text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  letter-spacing: -0.02em;
+  flex: 0 0 auto;
+}
+.fa-brand svg {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+/* The store's own logo (FAPPS_STORE_LOGO): the mark's height, its own
+   proportions, never wider than a word or two. */
+.fa-brand__logo {
+  display: block;
+  height: 30px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+}
+.fa-brand__tag {
+  color: var(--fe-text-muted);
+  font-weight: 600;
+}
+.fa-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fa-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fe-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: var(--fe-radius);
+}
+.fa-nav a:hover {
+  color: var(--fe-text);
+  background: var(--fe-bg-hover);
+}
+.fa-nav a.is-active {
+  color: var(--fe-primary-ink);
+  background: var(--fe-primary-soft);
+}
+.fa-account {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* ---------- choices side by side (FaSegmented.vue) ----------
+ * A radio group of buttons in one strip: filters of two to four values, the
+ * catalog's view, and (as icons in a pill) the theme. Only --fe-* values. */
+.fa-segmented {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius);
+  background: var(--fe-bg-elev);
+}
+.fa-segmented__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 10px;
+  border: 0;
+  border-radius: var(--fe-radius-sm);
+  background: transparent;
+  color: var(--fe-text-muted);
+  font: inherit;
+  font-size: var(--fe-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+.fa-segmented__btn:hover {
+  color: var(--fe-text);
+  background: var(--fe-bg-hover);
+}
+.fa-segmented__btn:active {
+  background: var(--fe-border-soft);
+}
+.fa-segmented__btn[aria-checked='true'] {
+  color: var(--fe-primary-ink);
+  background: var(--fe-primary-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fe-primary) 40%, transparent);
+}
+.fa-segmented__btn:focus-visible {
+  outline: 2px solid var(--fe-primary);
+  outline-offset: 1px;
+}
+/* Icons only (the theme): a pill of round buttons. */
+.fa-segmented--icons {
+  flex-wrap: nowrap;
+  border-radius: 999px;
+}
+.fa-segmented--icons .fa-segmented__btn {
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+}
+@media (pointer: coarse) {
+  .fa-segmented:not(.fa-segmented--icons) .fa-segmented__btn {
+    min-height: 40px;
+  }
+}
+@media (max-width: 400px) {
+  /* A narrow phone: the theme pill shrinks before the header wraps. */
+  .fa-segmented--icons .fa-segmented__btn {
+    width: 24px;
+    min-height: 24px;
+    height: 24px;
+  }
+  .fa-segmented--icons .fa-segmented__btn .fa-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+.fa-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--fe-primary-soft);
+  color: var(--fe-primary-ink);
+  font-weight: 700;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.fa-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fe-text);
+  font-size: var(--fe-text-sm);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.fa-account .fe-btn {
+  position: relative;
+  text-decoration: none;
+}
+@media (max-width: 719px) {
+  /* A phone: the brand and the account share the first row, the sections
+   * take the second, full width. */
+  .fa-nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .fa-account {
+    margin-inline-start: auto;
+  }
+  .fa-who__name {
+    display: none;
+  }
+  /* The account row fits beside the brand: Sign out keeps its name for a
+   * screen reader and shows only its icon. */
+  .fa-signout__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.fa-main {
+  min-width: 0;
+  min-height: 60vh;
+  padding-top: 28px;
+}
+.fa-main:focus {
+  outline: none;
+}
+
+.fa-footer {
+  margin-top: 64px;
+  border-top: 1px solid var(--fe-border);
+  background: var(--fe-bg-elev);
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+.fa-footer__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+@media (min-width: 720px) {
+  .fa-footer__inner {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.fa-footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.fa-footer__brand .fa-brand svg {
+  width: 24px;
+  height: 24px;
+}
+.fa-footer__brand .fa-brand__logo {
+  height: 24px;
+}
+/* Who runs the store: one line under the columns, its rule as wide as the
+   columns (not the page's side padding). */
+.fa-footer__about {
+  padding-bottom: 20px;
+}
+.fa-footer .fa-footer__about ul {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  border-top: 1px solid var(--fe-border);
+  padding-top: 16px;
+}
+.fa-footer p {
+  margin: 0;
+  max-width: 52ch;
+}
+.fa-footer h2 {
+  font-size: var(--fe-text-sm);
+  font-weight: 600;
+  color: var(--fe-text);
+  letter-spacing: 0;
+  margin-bottom: 8px;
+}
+.fa-footer ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fa-footer a {
+  color: var(--fe-text-muted);
+  text-decoration: none;
+}
+.fa-footer a:hover {
+  color: var(--fe-primary-ink);
+  text-decoration: underline;
+}
+
+/* ---------- page structure ---------- */
+.fa-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+@media (min-width: 720px) {
+  .fa-page {
+    gap: 36px;
+  }
+}
+.fa-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* The head of a working page (publish, review, administration): an icon
+ * tile, the title, one sentence, and the page's main action. */
+.fa-pagehead {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.fa-pagehead__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--fe-radius-lg);
+  background: var(--fe-primary-soft);
+  color: var(--fe-primary-ink);
+  flex: 0 0 auto;
+}
+.fa-pagehead__icon svg {
+  width: 22px;
+  height: 22px;
+}
+.fa-pagehead__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.fa-pagehead__text h1 {
+  overflow-wrap: anywhere;
+}
+.fa-pagehead__lead {
+  margin: 0;
+  color: var(--fe-text-muted);
+  max-width: 72ch;
+}
+.fa-pagehead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The first band of a showcase page (the catalog, an app, a publisher). */
+.fa-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fa-radius-xl);
+  background:
+    radial-gradient(70% 120% at 0% 0%, var(--fa-glow), transparent 65%),
+    radial-gradient(50% 90% at 100% 100%, color-mix(in srgb, var(--fa-tone) 10%, transparent), transparent 70%),
+    var(--fe-bg-elev);
+  box-shadow: var(--fa-shadow-1);
+  padding: 24px 20px;
+  isolation: isolate;
+}
+/* A faint dot grid behind the band's right side: texture, not content. */
+.fa-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(var(--fa-dots) 1px, transparent 1.4px);
+  background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 35%, var(--fe-bg) 100%);
+  mask-image: linear-gradient(100deg, transparent 35%, var(--fe-bg) 100%);
+  pointer-events: none;
+}
+@media (min-width: 720px) {
+  .fa-hero {
+    padding: 36px 40px;
+  }
+}
+
+.fa-panel {
+  background: var(--fa-card);
+  box-shadow: var(--fa-shadow-1);
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.fa-panel--soft {
+  background: var(--fa-soft);
+  box-shadow: none;
+}
+.fa-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.fa-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fa-panel__title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--fe-primary-ink);
+}
+
+.fa-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.fa-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.fa-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.fa-heading__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--fe-radius);
+  background: color-mix(in srgb, var(--fa-tone) 14%, var(--fe-bg));
+  color: color-mix(in srgb, var(--fa-tone) 60%, var(--fe-text));
+  flex: 0 0 auto;
+}
+.fa-heading__icon svg {
+  width: 17px;
+  height: 17px;
+}
+.fa-section__sub {
+  margin: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-md);
+}
+.fa-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+}
+@media (min-width: 960px) {
+  .fa-columns {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+  .fa-sticky {
+    position: sticky;
+    top: 84px;
+  }
+}
+
+.fa-note {
+  color: var(--fe-text-muted);
+  margin: 0;
+}
+.fa-lead {
+  margin: 0;
+  max-width: 72ch;
+}
+
+.fa-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  justify-self: start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--fe-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--fe-primary) 24%, transparent);
+  color: var(--fe-primary-ink);
+  font-size: var(--fe-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.fa-eyebrow__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fe-primary);
+}
+
+/* ---------- callouts ---------- */
+.fa-callout {
+  --fa-c: var(--fe-text-muted);
+  border: 1px solid color-mix(in srgb, var(--fa-c) 32%, var(--fe-border));
+  border-radius: var(--fe-radius-lg);
+  background: color-mix(in srgb, var(--fa-c) 7%, var(--fe-bg));
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+.fa-callout p {
+  margin: 0;
+}
+.fa-callout--row {
+  flex-direction: row;
+  gap: 12px;
+}
+.fa-callout__icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--fa-c);
+  margin-top: 1px;
+}
+.fa-callout__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.fa-callout--danger {
+  --fa-c: var(--fe-danger);
+}
+.fa-callout--warn {
+  --fa-c: var(--fe-warning);
+}
+.fa-callout--ok {
+  --fa-c: var(--fe-ok);
+}
+.fa-callout--info {
+  --fa-c: var(--fe-primary);
+}
+.fa-callout__title {
+  font-weight: 600;
+}
+/* A withdrawal (revoked app, yanked version): the band nobody scrolls past. */
+.fa-callout--strong {
+  border-width: 1px 1px 1px 4px;
+  border-inline-start-color: var(--fa-c);
+  padding: 14px 18px;
+}
+
+/* ---------- badges and chips ---------- */
+.fa-badge {
+  --fa-c: var(--fe-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 9px;
+  border: 1px solid color-mix(in srgb, var(--fa-c) 30%, var(--fe-border));
+  border-radius: 999px;
+  font-size: var(--fe-text-xs);
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--fe-text);
+  background: color-mix(in srgb, var(--fa-c) 10%, var(--fe-bg));
+  white-space: nowrap;
+}
+.fa-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fa-c);
+  flex: 0 0 auto;
+}
+.fa-badge svg {
+  width: 13px;
+  height: 13px;
+  color: var(--fa-c);
+  flex: 0 0 auto;
+}
+.fa-badge--ok {
+  --fa-c: var(--fe-ok);
+}
+.fa-badge--warn {
+  --fa-c: var(--fe-warning);
+}
+.fa-badge--danger {
+  --fa-c: var(--fe-danger);
+}
+.fa-badge--info {
+  --fa-c: var(--fe-primary);
+}
+.fa-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: var(--fe-radius-sm);
+  background: var(--fe-bg-elev);
+  border: 1px solid var(--fe-border-soft);
+  font-size: var(--fe-text-xs);
+  line-height: 18px;
+  color: var(--fe-text);
+  white-space: nowrap;
+}
+.fa-chip svg {
+  width: 12px;
+  height: 12px;
+  color: var(--fe-text-muted);
+}
+
+/* A filter that is a button: on or off (aria-pressed). */
+.fa-filterchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* On a phone the categories are one row that scrolls sideways inside
+ * itself, rather than four rows of chips above the apps. */
+@media (max-width: 719px) {
+  .fa-filterchips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+  .fa-filterchips > li {
+    flex: 0 0 auto;
+  }
+}
+.fa-filterchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--fe-h-md);
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--fe-border);
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.fa-filterchip svg {
+  width: 15px;
+  height: 15px;
+  color: var(--fe-text-muted);
+}
+.fa-filterchip:hover {
+  border-color: var(--fe-border-strong);
+  background: var(--fe-bg-hover);
+}
+.fa-filterchip[aria-pressed='true'] {
+  background: var(--fe-primary-soft);
+  border-color: color-mix(in srgb, var(--fe-primary) 45%, transparent);
+  color: var(--fe-primary-ink);
+}
+.fa-filterchip[aria-pressed='true'] svg {
+  color: var(--fe-primary-ink);
+}
+
+/* Two or three choices side by side (Grid / List). */
+/* ---------- values ---------- */
+.fa-code {
+  font-family: var(--fe-font-mono);
+  font-size: var(--fe-text-xs);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.fa-copyfield {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* ⚠ position: relative is load-bearing. The button's screen-reader status
+ * (.fe-sr-only) is absolutely positioned; without a positioned ancestor its
+ * containing block is the page, so inside a table that scrolls sideways it
+ * escapes the table's clipping and widens the whole page (measured: 101 px
+ * at 375 px on the app page's hash table). */
+.fa-copy {
+  display: inline-flex;
+  position: relative;
+}
+/* A value to paste into filex: the value in a box, the Copy button inside
+ * it on the right. */
+.fa-copybox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius);
+  background: var(--fe-bg-elev);
+}
+.fa-copybox code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--fe-font-mono);
+  font-size: var(--fe-text-md);
+  overflow-wrap: anywhere;
+}
+
+/* A label and its value, side by side where there is room, stacked on a
+ * phone. Not a table: one record's fields, read top to bottom. */
+.fa-dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+}
+.fa-dl dt {
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+.fa-dl dd {
+  margin: 0 0 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 640px) {
+  .fa-dl {
+    grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  }
+  .fa-dl dd {
+    margin: 0;
+  }
+}
+/* The same, always side by side, in a narrow card (the app page's details). */
+.fa-dl--card {
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 10px 16px;
+}
+.fa-dl--card dd {
+  margin: 0;
+  text-align: end;
+}
+.fa-dl--card dd .fa-chips {
+  justify-content: flex-end;
+}
+
+.fa-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: fa-step;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 72ch;
+}
+.fa-steps li {
+  counter-increment: fa-step;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.fa-steps li::before {
+  content: counter(fa-step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--fe-primary-soft);
+  color: var(--fe-primary-ink);
+  font-size: var(--fe-text-xs);
+  font-weight: 700;
+}
+
+.fa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.fa-actions .fe-btn {
+  text-decoration: none;
+}
+
+/* ---------- the step indicator (publish, ask for a publisher, submit) */
+.fa-stepper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 820px) {
+  .fa-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.fa-step {
+  --fa-c: var(--fe-border-strong);
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fa-card);
+}
+.fa-step__num {
+  grid-row: span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--fa-c);
+  color: var(--fe-text-muted);
+  font-weight: 700;
+  font-size: var(--fe-text-md);
+}
+.fa-step__num svg {
+  width: 16px;
+  height: 16px;
+}
+.fa-step__title {
+  font-weight: 600;
+}
+.fa-step__text {
+  margin: 0;
+  color: var(--fa-text-soft);
+  font-size: var(--fe-text-md);
+}
+.fa-step--done {
+  --fa-c: var(--fe-ok);
+}
+.fa-step--done .fa-step__num {
+  background: color-mix(in srgb, var(--fe-ok) 14%, var(--fe-bg));
+  color: var(--fe-text);
+}
+.fa-step--done .fa-step__num svg {
+  color: var(--fe-ok);
+}
+.fa-step--current {
+  --fa-c: var(--fe-primary);
+  border-color: color-mix(in srgb, var(--fe-primary) 45%, var(--fe-border));
+  background: color-mix(in srgb, var(--fe-primary) 5%, var(--fe-bg));
+}
+.fa-step--current .fa-step__num {
+  background: var(--fe-primary);
+  color: var(--fe-text-on-primary);
+}
+
+/* ---------- one table cell's content: ONE wrapper (filex lessons #373/#433) */
+.fa-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  position: relative;
+}
+.fa-cell > span,
+.fa-cell > a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-cell > .fa-badge,
+.fa-cell > .fa-appicon,
+.fa-cell > .fa-copy {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+/* Badges beside a name give way first (the name says which row this is),
+ * and stay on the row's one line: wrapping stacked them out of the row. */
+.fa-cell > .fa-badges {
+  flex: 0 1000 auto;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+/* A hash or id in a cell stays on one line and ends in an ellipsis; the
+ * full value is in its title and its Copy button. */
+.fe-list__row .fa-code {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+}
+.fa-cell--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* A few facts beside a form, each with a check. */
+.fa-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-facts li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  color: var(--fa-text-soft);
+}
+.fa-facts svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--fe-ok);
+}
+
+/* ---------- forms ---------- */
+/* A field's hint and error sit right under it, not a paragraph away. */
+.fe-field p {
+  margin: 0;
+}
+.fa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+.fa-form--wide {
+  max-width: none;
+}
+/* ---------- a select without the native dropdown (FaSelect.vue) ----------
+ * The combobox looks like an input; the listbox is teleported to <body> (or
+ * the open <dialog>) and placed by the component. Only --fe-* values. */
+.fa-select {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.fa-select__trigger {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--fe-h-md);
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-sm);
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.fa-select__trigger:hover {
+  border-color: var(--fe-border-strong);
+}
+.fa-select.is-open .fa-select__trigger {
+  border-color: var(--fe-primary);
+  box-shadow: 0 0 0 3px var(--fe-primary-soft);
+}
+.fa-select.is-invalid .fa-select__trigger {
+  border-color: var(--fe-danger);
+}
+.fa-select__trigger:disabled {
+  cursor: not-allowed;
+  color: var(--fe-text-muted);
+  background: var(--fe-bg-elev);
+}
+.fa-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-select__value.is-placeholder {
+  color: var(--fe-text-muted);
+}
+.fa-select__chev {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--fe-text-muted);
+  transition: transform 0.16s ease;
+}
+.fa-select.is-open .fa-select__chev {
+  transform: rotate(180deg);
+}
+/* The hidden input that carries `required` for the form's own validation. */
+.fa-select__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.fa-select__panel {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius);
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  box-shadow: var(--fe-shadow);
+  font-size: var(--fe-text-sm);
+}
+.fa-select__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--fe-radius-sm);
+  cursor: pointer;
+}
+.fa-select__option.is-active {
+  background: var(--fe-bg-hover);
+}
+.fa-select__option.is-selected {
+  color: var(--fe-primary-ink);
+  font-weight: 600;
+}
+.fa-select__option[aria-disabled='true'] {
+  color: var(--fe-text-muted);
+  cursor: not-allowed;
+}
+.fa-select__label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fa-select__hint {
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-xs);
+  font-weight: 400;
+}
+.fa-select__check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--fe-primary);
+}
+@media (pointer: coarse) {
+  /* A finger needs a bigger target. */
+  .fa-select__trigger,
+  .fa-select__option {
+    min-height: 44px;
+  }
+}
+.fe-input {
+  min-height: var(--fe-h-md);
+}
+.fa-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 140px;
+  max-width: 100%;
+}
+.fa-filter--wide {
+  flex: 2 1 220px;
+}
+.fa-filter--auto {
+  flex: 0 1 auto;
+}
+/* A segmented choice keeps its own width under its label. */
+.fa-filter .fa-segmented {
+  align-self: flex-start;
+}
+.fa-filter label,
+.fa-filter .fa-filter__label {
+  font-size: var(--fe-text-xs);
+  color: var(--fe-text-muted);
+}
+.fa-filter .fe-input {
+  padding: 6px 8px;
+}
+.fa-filter--check {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  padding-bottom: 6px;
+}
+.fa-inline-error {
+  color: var(--fe-danger);
+  font-size: var(--fe-text-xs);
+}
+.fa-fieldset {
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius);
+  padding: 12px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.fa-fieldset legend {
+  padding: 0 4px;
+  font-size: var(--fe-text-sm);
+  color: var(--fe-text-muted);
+}
+.fa-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.fa-shotrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+@media (min-width: 640px) {
+  .fa-shotrow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+}
+.fa-pre {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--fe-bg-elev);
+  border: 1px solid var(--fe-border-soft);
+  border-radius: var(--fe-radius);
+  font-family: var(--fe-font-mono);
+  font-size: var(--fe-text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* ---------- the catalog ---------- */
+.fa-cathero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.fa-cathero h1 {
+  font-size: clamp(1.75rem, 4.2vw, 2.625rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.fa-hero--slim h1 {
+  font-size: clamp(1.625rem, 3.4vw, 2.25rem);
+}
+@media (min-width: 960px) {
+  .fa-cathero--art {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    column-gap: 40px;
+  }
+  .fa-cathero--art > :not(.fa-cathero__art) {
+    grid-column: 1;
+  }
+}
+/* The shop window's own picture: the listed apps' icons, scattered. */
+.fa-cathero__art {
+  display: none;
+}
+@media (min-width: 960px) {
+  .fa-cathero__art {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    align-self: center;
+    display: grid;
+    grid-template-columns: repeat(3, 76px);
+    grid-auto-rows: 76px;
+    gap: 18px;
+    justify-content: center;
+    padding: 12px;
+  }
+  .fa-cathero__art > * {
+    transition: transform 0.4s ease;
+  }
+  .fa-cathero__art > :nth-child(1) {
+    transform: rotate(-8deg) translateY(10px);
+  }
+  .fa-cathero__art > :nth-child(2) {
+    transform: rotate(5deg) translateY(-14px);
+  }
+  .fa-cathero__art > :nth-child(3) {
+    transform: rotate(-3deg) translateY(16px);
+  }
+  .fa-cathero__art > :nth-child(4) {
+    transform: rotate(6deg) translateX(8px);
+  }
+  .fa-cathero__art > :nth-child(5) {
+    transform: rotate(-6deg) translateY(-6px);
+  }
+  .fa-cathero__art > :nth-child(6) {
+    transform: rotate(4deg) translateY(12px);
+  }
+  .fa-hero:hover .fa-cathero__art > * {
+    transform: none;
+  }
+  .fa-cathero__art .fa-appicon {
+    box-shadow: 0 16px 30px -14px color-mix(in srgb, var(--fe-text) 45%, transparent), 0 0 0 1px var(--fe-border-soft);
+  }
+}
+.fa-cathero__accent {
+  color: var(--fe-primary-ink);
+}
+.fa-cathero__lead {
+  margin: 0;
+  color: var(--fa-text-soft);
+  font-size: 1rem;
+  max-width: 62ch;
+}
+.fa-search {
+  position: relative;
+  max-width: 640px;
+}
+.fa-search .fa-icon {
+  position: absolute;
+  inset-inline-start: 16px;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  color: var(--fe-text-muted);
+  pointer-events: none;
+}
+.fa-search__input.fe-input {
+  height: 52px;
+  padding: 10px 16px 10px 48px;
+  border-radius: var(--fe-radius-lg);
+  font-size: 1rem;
+  background: var(--fe-bg);
+  border-color: var(--fe-border-strong);
+}
+.fa-search__input.fe-input:focus-visible {
+  outline: none;
+  border-color: var(--fe-primary);
+  box-shadow: 0 0 0 4px var(--fa-ring);
+}
+.fa-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fa-text-soft);
+  font-size: var(--fe-text-md);
+}
+.fa-trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fa-trust svg {
+  width: 16px;
+  height: 16px;
+  color: var(--fe-ok);
+}
+
+.fa-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.fa-toolbar__count {
+  margin: 0;
+  font-weight: 600;
+}
+.fa-toolbar__controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-width: 0;
+}
+.fa-toolbar__controls .fa-filter {
+  flex: 0 1 auto;
+}
+.fa-toolbar__controls .fa-filter .fe-input {
+  width: 9.5em;
+}
+.fa-toolbar__controls .fa-filter--check {
+  padding-bottom: 8px;
+}
+
+/* The card grid. Not a table: a shop window, one card per app. */
+.fa-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 264px), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-cards--feature {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+}
+.fa-cards > li {
+  display: flex;
+  min-width: 0;
+}
+.fa-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
+  background: var(--fa-card);
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  box-shadow: var(--fa-shadow-1);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.fa-card:hover {
+  border-color: var(--fa-card-hover);
+  box-shadow: var(--fa-shadow-2);
+  transform: translateY(-3px);
+}
+.fa-card .fa-appicon {
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--fa-tone) 70%, transparent);
+  transition: transform 0.18s ease;
+}
+.fa-card:hover .fa-appicon {
+  transform: scale(1.04);
+}
+.fa-card:focus-within {
+  border-color: var(--fe-primary);
+  box-shadow: 0 0 0 3px var(--fa-ring);
+}
+.fa-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.fa-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.fa-card__title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.fa-card__title a {
+  color: var(--fe-text);
+  text-decoration: none;
+}
+/* The whole card is the app's link; the publisher's link stays its own. */
+.fa-card__title a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.fa-card__title a:focus-visible {
+  outline: none;
+}
+.fa-card__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+  overflow-wrap: anywhere;
+}
+.fa-card__pub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+.fa-card__pub a {
+  position: relative;
+  z-index: 1;
+  color: var(--fe-text-muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.fa-card__pub a:hover {
+  color: var(--fe-primary-ink);
+  text-decoration: underline;
+}
+.fa-card__summary {
+  margin: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-md);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 3em;
+}
+.fa-card__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--fe-border-soft);
+  min-width: 0;
+}
+.fa-card__meta {
+  margin-inline-start: auto;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-xs);
+  white-space: nowrap;
+}
+/* A file-type search: what the app does with each kind searched for. */
+.fa-card__uses {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fe-text-sm);
+  min-width: 0;
+}
+.fa-card__uses li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.fa-card__usetext {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A kind of file (".docx", "image/*", "Any file"), on a card, in a table
+ * cell and on an app's page. */
+.fa-chip--kind {
+  flex: 0 0 auto;
+  font-family: var(--fe-font-mono);
+  background: var(--fe-primary-soft);
+  border-color: color-mix(in srgb, var(--fe-primary) 24%, transparent);
+  color: var(--fe-primary-ink);
+}
+a.fa-chip--kind {
+  text-decoration: none;
+}
+a.fa-chip--kind:hover {
+  text-decoration: underline;
+}
+.fa-ftpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.fa-uses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-uses li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+}
+/* The conversions a submission's listing declares, one entry a line, for
+ * the reviewer. */
+.fa-declared {
+  margin: 0;
+  padding-inline-start: 18px;
+  font-family: var(--fe-font-mono);
+  font-size: var(--fe-text-xs);
+  overflow-wrap: anywhere;
+}
+.fa-card--feature {
+  padding: 20px;
+  gap: 14px;
+  background:
+    radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--fa-tone) 13%, transparent), transparent 60%),
+    var(--fa-card);
+}
+.fa-card--feature .fa-card__title {
+  font-size: 1.125rem;
+}
+.fa-card--feature .fa-card__summary,
+.fa-card--feature .fa-card__pub,
+.fa-card--feature .fa-card__pub a {
+  color: var(--fa-text-soft);
+}
+.fa-card--feature .fa-card__pub a:hover {
+  color: var(--fe-primary-ink);
+}
+.fa-card--feature .fa-card__summary {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  min-height: 0;
+}
+
+/* The shelves of the catalog's front page sit further apart than a stack. */
+.fa-shelf + .fa-shelf {
+  margin-top: 28px;
+}
+
+/* While the list loads: grey cards where the real ones will be. */
+.fa-card--skeleton {
+  pointer-events: none;
+}
+.fa-skel {
+  display: block;
+  border-radius: var(--fe-radius-sm);
+  background: linear-gradient(90deg, var(--fe-bg-elev) 0%, var(--fe-bg-hover) 50%, var(--fe-bg-elev) 100%);
+  background-size: 200% 100%;
+  animation: fa-shimmer 1.4s ease-in-out infinite;
+}
+.fa-skel--icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+.fa-skel--line {
+  height: 12px;
+  width: 100%;
+}
+.fa-skel--short {
+  width: 45%;
+}
+.fa-skel--block {
+  height: 180px;
+  border-radius: var(--fe-radius-lg);
+}
+@keyframes fa-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-skel {
+    animation: none;
+  }
+  .fa-card,
+  .fa-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Nothing to show: an icon, a sentence, a way on. */
+.fa-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--fe-border-strong);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fe-bg-elev);
+}
+.fa-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--fe-primary-soft);
+  color: var(--fe-primary-ink);
+}
+.fa-empty__icon svg {
+  width: 26px;
+  height: 26px;
+}
+.fa-empty__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1rem;
+}
+.fa-empty p {
+  margin: 0;
+}
+
+.fa-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+/* ---------- media ---------- */
+.fa-appicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 22%;
+  object-fit: cover;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+img.fa-appicon {
+  background: var(--fe-bg-elev);
+  box-shadow: 0 0 0 1px var(--fe-border-soft);
+}
+/* No icon of its own: its initial, on a tone picked from the name. Small
+ * tiles take the soft ground and dark ink (any size reads); large tiles the
+ * full tone, where the initial is large text. */
+.fa-appicon--letter {
+  background: color-mix(in srgb, var(--fa-tone) 18%, var(--fe-bg));
+  color: color-mix(in srgb, var(--fa-tone) 50%, var(--fe-text));
+}
+.fa-appicon--solid {
+  background: linear-gradient(140deg, var(--fa-tone), color-mix(in srgb, var(--fa-tone) 70%, var(--fe-text)));
+  color: var(--fe-bg);
+}
+.fa-tone-0 {
+  --fa-tone: var(--fe-icon-image);
+}
+.fa-tone-1 {
+  --fa-tone: var(--fe-icon-video);
+}
+.fa-tone-2 {
+  --fa-tone: var(--fe-icon-audio);
+}
+.fa-tone-3 {
+  --fa-tone: var(--fe-icon-pdf);
+}
+.fa-tone-4 {
+  --fa-tone: var(--fe-icon-sheet);
+}
+.fa-tone-5 {
+  --fa-tone: var(--fe-icon-slides);
+}
+.fa-tone-6 {
+  --fa-tone: var(--fe-icon-storage);
+}
+
+/* Screenshots: a strip that scrolls sideways (inside itself), each one a
+ * button that opens it large. */
+.fa-gallery {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 82%);
+  gap: 14px;
+  margin: 0;
+  padding: 2px 2px 10px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+}
+@media (min-width: 720px) {
+  .fa-gallery {
+    grid-auto-columns: minmax(280px, 46%);
+  }
+}
+.fa-gallery > li {
+  scroll-snap-align: start;
+  min-width: 0;
+}
+.fa-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: zoom-in;
+  border-radius: var(--fe-radius-lg);
+}
+.fa-shot__frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fe-bg-elev);
+  box-shadow: var(--fa-shadow-1);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.fa-shot__frame img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top left;
+  transition: transform 0.3s ease;
+}
+.fa-shot__zoom {
+  position: absolute;
+  inset-inline-end: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fe-bg) 88%, transparent);
+  color: var(--fe-text);
+  box-shadow: var(--fa-shadow-1);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.fa-shot__zoom svg {
+  width: 16px;
+  height: 16px;
+}
+.fa-shot:hover .fa-shot__frame,
+.fa-shot:focus-visible .fa-shot__frame {
+  border-color: var(--fa-card-hover);
+  box-shadow: var(--fa-shadow-2);
+}
+.fa-shot:hover .fa-shot__frame img {
+  transform: scale(1.02);
+}
+.fa-shot:hover .fa-shot__zoom,
+.fa-shot:focus-visible .fa-shot__zoom {
+  opacity: 1;
+  transform: none;
+}
+.fa-shot__caption {
+  font-size: var(--fe-text-sm);
+  color: var(--fe-text-muted);
+}
+
+/* The gallery: the whole window, the picture as large as it fits, a bar of
+ * caption and Close above it, the thumbnails below. Follows the theme. */
+.fa-noscroll {
+  overflow: hidden;
+}
+.fa-lightbox {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--fe-bg);
+  color: var(--fe-text);
+}
+.fa-lightbox[open] {
+  animation: fa-fade 0.18s ease-out;
+}
+.fa-lightbox::backdrop {
+  background: var(--fe-bg);
+  opacity: 0.6;
+}
+.fa-lightbox__frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  gap: 8px;
+  padding: 12px clamp(8px, 2vw, 24px) 16px;
+}
+.fa-lightbox__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.fa-lightbox__count {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--fe-bg-elev);
+  border: 1px solid var(--fe-border);
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.fa-lightbox__caption {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-lightbox__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--fe-border);
+  border-radius: 50%;
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  cursor: pointer;
+  box-shadow: var(--fa-shadow-1);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.fa-lightbox__btn svg {
+  width: 20px;
+  height: 20px;
+}
+.fa-lightbox__btn:hover {
+  background: var(--fe-bg-hover);
+  border-color: var(--fe-border-strong);
+}
+.fa-lightbox__btn:active {
+  transform: scale(0.95);
+}
+.fa-lightbox__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  touch-action: pan-y;
+  user-select: none;
+}
+.fa-lightbox__img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--fe-radius);
+  border: 1px solid var(--fe-border);
+  box-shadow: var(--fa-shadow-2);
+  animation: fa-fade 0.2s ease-out;
+}
+.fa-lightbox__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+}
+.fa-lightbox__nav:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.fa-lightbox__nav--prev {
+  inset-inline-start: 4px;
+}
+.fa-lightbox__nav--next {
+  inset-inline-end: 4px;
+}
+.fa-lightbox__thumbs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-x: auto;
+}
+.fa-lightbox__thumbs button {
+  display: block;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--fe-radius);
+  background: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.fa-lightbox__thumbs button:hover {
+  opacity: 1;
+}
+.fa-lightbox__thumbs button[aria-current='true'] {
+  opacity: 1;
+  border-color: var(--fe-primary);
+}
+.fa-lightbox__thumbs img {
+  display: block;
+  width: 72px;
+  height: 45px;
+  object-fit: cover;
+  object-position: top left;
+  border-radius: var(--fe-radius-sm);
+}
+@keyframes fa-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fa-prose {
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.fa-prose > :first-child {
+  margin-top: 0;
+}
+.fa-prose > :last-child {
+  margin-bottom: 0;
+}
+.fa-prose img {
+  max-width: 100%;
+}
+.fa-prose pre {
+  overflow: auto;
+  background: var(--fe-bg-elev);
+  padding: 8px;
+  border-radius: var(--fe-radius-sm);
+}
+.fa-prose h2,
+.fa-prose h3,
+.fa-prose h4 {
+  margin: 1.4em 0 0.5em;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.fa-prose code {
+  font-family: var(--fe-font-mono);
+  font-size: 0.9em;
+}
+
+/* ---------- the app page ---------- */
+/* The side column (install, version, publisher) comes first in the reading
+ * order; on a wide screen it stands on the right. */
+@media (min-width: 960px) {
+  .fa-appcols {
+    grid-template-areas: 'main side';
+  }
+  .fa-appside {
+    grid-area: side;
+  }
+  .fa-appmain {
+    grid-area: main;
+  }
+}
+.fa-apphead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+@media (min-width: 720px) {
+  .fa-apphead {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+  }
+}
+.fa-apphead > .fa-appicon,
+.fa-pubhead > .fa-appicon {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fa-tone) 20%, transparent),
+    0 18px 36px -14px color-mix(in srgb, var(--fa-tone) 75%, transparent);
+}
+.fa-apphead__text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.fa-apphead__text h1 {
+  font-size: clamp(1.625rem, 3.4vw, 2.125rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.fa-apphead__by {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--fa-text-soft);
+}
+.fa-hero .fa-muted,
+.fa-hero .fa-note,
+.fa-callout .fa-note,
+.fa-panel--soft .fa-note,
+.fa-install .fa-copyrow__label {
+  color: var(--fa-text-soft);
+}
+.fa-apphead__summary {
+  margin: 0;
+  font-size: 1.0625rem;
+  max-width: 64ch;
+}
+.fa-apphead__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-apphead__meta .fa-chip {
+  background: var(--fe-bg);
+  padding: 2px 10px;
+}
+
+.fa-install {
+  border-color: color-mix(in srgb, var(--fe-primary) 30%, var(--fe-border));
+  background:
+    radial-gradient(120% 80% at 100% 0%, var(--fa-glow), transparent 60%),
+    var(--fe-bg);
+}
+.fa-copyrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.fa-copyrow__label {
+  font-size: var(--fe-text-xs);
+  font-weight: 600;
+  color: var(--fe-text-muted);
+}
+
+/* Permissions, in filex's words, each with a picture of what it touches. */
+.fa-perms {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  overflow: hidden;
+}
+.fa-perm {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 16px;
+  background: var(--fa-card);
+}
+.fa-perm + .fa-perm {
+  border-top: 1px solid var(--fe-border-soft);
+}
+.fa-perm__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--fe-radius);
+  background: color-mix(in srgb, var(--fa-tone) 14%, var(--fe-bg));
+  color: color-mix(in srgb, var(--fa-tone) 55%, var(--fe-text));
+}
+.fa-perm__icon svg {
+  width: 18px;
+  height: 18px;
+}
+.fa-perm__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fa-perm__label {
+  font-weight: 500;
+}
+.fa-perm__why {
+  margin: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-md);
+}
+.fa-perm__id {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: var(--fe-radius-sm);
+  background: var(--fe-bg-elev);
+  border: 1px solid var(--fe-border-soft);
+  color: var(--fe-text-muted);
+  font-family: var(--fe-font-mono);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/* An advanced section, closed until asked for. */
+.fa-disclosure {
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fa-card);
+  box-shadow: var(--fa-shadow-1);
+}
+.fa-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--fe-radius-lg);
+}
+.fa-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.fa-disclosure > summary:hover {
+  background: var(--fe-bg-hover);
+}
+.fa-disclosure__chev {
+  width: 18px;
+  height: 18px;
+  color: var(--fe-text-muted);
+  transition: transform 0.16s ease;
+  flex: 0 0 auto;
+}
+.fa-disclosure[open] .fa-disclosure__chev {
+  transform: rotate(180deg);
+}
+.fa-disclosure__title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+.fa-disclosure__hint {
+  margin-inline-start: auto;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+/* On the hovered summary's background the muted hint falls under 4.5:1
+ * (axe, 2026-10-05: 4.39 in light); it darkens with it. */
+.fa-disclosure > summary:hover .fa-disclosure__hint {
+  color: var(--fa-text-soft);
+}
+.fa-disclosure__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 18px 18px;
+  min-width: 0;
+}
+
+.fa-pubcard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.fa-pubcard__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fa-pubcard__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- the publisher page ---------- */
+.fa-pubhead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+}
+.fa-pubhead__text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.fa-pubhead__text h1 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.fa-pubhead__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-pubhead__links a,
+.fa-pubhead__links span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.fa-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 16px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fa-card);
+  box-shadow: var(--fa-shadow-1);
+}
+.fa-stat__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.fa-stat__label {
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+
+/* ---------- the sign-in page ---------- */
+/* One card in the middle of the page: who you are signing in as, and the
+ * one button that does it. */
+.fa-signin {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 24px;
+}
+.fa-signin__card {
+  width: 100%;
+  max-width: 460px;
+  padding: 32px 28px;
+  gap: 22px;
+  box-shadow: var(--fa-shadow-2);
+}
+.fa-signin__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.fa-signin__head svg {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  box-shadow: 0 14px 28px -12px color-mix(in srgb, var(--fe-primary) 70%, transparent);
+}
+.fa-signin__head p {
+  margin: 0;
+  color: var(--fe-text-muted);
+  max-width: 40ch;
+}
+.fa-door {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fa-door__title {
+  font-size: var(--fe-text-sm);
+  font-weight: 600;
+  color: var(--fe-text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.fa-door .fe-btn {
+  width: 100%;
+}
+.fa-door__note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-md);
+}
+.fa-door__note .fa-icon {
+  margin-top: 2px;
+  color: var(--fe-ok);
+}
+
+/* ---------- the submission page ---------- */
+.fa-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-progress li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--fe-border);
+  background: var(--fe-bg);
+  color: var(--fe-text-muted);
+  font-size: var(--fe-text-sm);
+}
+.fa-progress li svg {
+  width: 15px;
+  height: 15px;
+}
+.fa-progress .is-done {
+  color: var(--fe-text);
+}
+.fa-progress .is-done svg {
+  color: var(--fe-ok);
+}
+.fa-progress .is-current {
+  color: var(--fe-primary-ink);
+  border-color: color-mix(in srgb, var(--fe-primary) 45%, var(--fe-border));
+  background: var(--fe-primary-soft);
+  font-weight: 600;
+}
+.fa-progress .is-failed {
+  color: var(--fe-text);
+  border-color: color-mix(in srgb, var(--fe-danger) 45%, var(--fe-border));
+  background: color-mix(in srgb, var(--fe-danger) 8%, var(--fe-bg));
+}
+.fa-progress .is-failed svg {
+  color: var(--fe-danger);
+}
+
+/* ---------- admin tabs (links: each section has its own address) ---------- */
+.fa-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fe-radius-lg);
+  background: var(--fe-bg-elev);
+  overflow-x: auto;
+}
+.fa-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--fe-radius);
+  color: var(--fe-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.fa-tabs a svg {
+  width: 15px;
+  height: 15px;
+}
+.fa-tabs a:hover {
+  color: var(--fe-text);
+}
+.fa-tabs a.is-active {
+  background: var(--fe-bg);
+  color: var(--fe-primary-ink);
+  box-shadow: 0 0 0 1px var(--fe-border);
+}
+
+/* ---------- dialog ---------- */
+.fa-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--fe-border);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fe-bg);
+  color: var(--fe-text);
+  box-shadow: var(--fe-shadow);
+}
+/* The page behind dims toward its own ground: white in light, near-black in
+ * dark (custom properties reach ::backdrop in current engines). */
+.fa-dialog::backdrop {
+  background: var(--fe-bg);
+  opacity: 0.8;
+}
+.fa-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fa-dialog__title {
+  font-size: 1.125rem;
+}
+
+/* The table's toolbar holds labelled fields; on a phone they take the row. */
+.tbl-bar .fa-filter {
+  flex: 0 1 220px;
+}
+.tbl-bar .fa-filter--auto {
+  flex: 0 1 auto;
+}
+.tbl-bar .fa-filter--wide {
+  flex: 1 1 260px;
+  max-width: 420px;
+}

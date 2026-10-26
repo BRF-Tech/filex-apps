@@ -1,0 +1,84 @@
+{
+  "manifest_version": 1,
+  "name": "drawio",
+  "version": "31.5.3",
+  "filex": ">=0.48.0",
+  "label": {
+    "en": "draw.io",
+    "tr": "draw.io"
+  },
+  "description": {
+    "en": "Draw and edit diagrams (.drawio, .dio) with the draw.io editor, inside filex.",
+    "tr": "Diyagramları (.drawio, .dio) filex içinde draw.io düzenleyicisiyle çizin ve düzenleyin."
+  },
+  "homepage": "https://github.com/BRF-Tech/filex-drawio",
+  "permissions": [
+    "files:read",
+    "files:write"
+  ],
+  "permission_reasons": {
+    "files:read": {
+      "en": "To open the diagram you open with it.",
+      "tr": "Onunla açtığınız diyagramı açmak için."
+    },
+    "files:write": {
+      "en": "To save the diagram back as a new version.",
+      "tr": "Diyagramı yeni sürüm olarak geri kaydetmek için."
+    },
+    "ui": {
+      "en": "draw.io is this app: it runs in your browser, in the sandbox filex draws for it.",
+      "tr": "Bu uygulama draw.io'nun kendisi: filex'in onun için çizdiği yalıtım alanında, tarayıcınızda çalışır."
+    },
+    "ui:package-fetch": {
+      "en": "draw.io loads its own translations, shapes and templates from its package while it runs.",
+      "tr": "draw.io çalışırken kendi çevirilerini, şekillerini ve şablonlarını paketinden yükler."
+    },
+    "ui-viewer:.drawio": {
+      "en": "So a .drawio diagram opens in draw.io.",
+      "tr": "Bir .drawio diyagramı draw.io'da açılsın diye."
+    },
+    "ui-viewer:.dio": {
+      "en": "So a .dio diagram opens in draw.io.",
+      "tr": "Bir .dio diyagramı draw.io'da açılsın diye."
+    },
+    "ui-new:.drawio": {
+      "en": "So you can start a new diagram from New document.",
+      "tr": "Yeni belge'den yeni bir diyagram başlatabilesiniz diye."
+    }
+  },
+  "ui": {
+    "bundle": {
+      "url": "https://github.com/BRF-Tech/filex-drawio/releases/download/v31.5.3/ui.zip",
+      "sha256": "2ec43b1f0e2a31f24e7bf26900e177dd5591f0e06ad118875ffdf16885012c83"
+    },
+    "package_fetch": true
+  },
+  "views": [
+    {
+      "id": "editor",
+      "placement": "viewer",
+      "ui": "index.html",
+      "label": {
+        "en": "draw.io",
+        "tr": "draw.io"
+      },
+      "applies": {
+        "ext": [
+          "drawio",
+          "dio"
+        ]
+      }
+    }
+  ],
+  "new_documents": [
+    {
+      "ext": "drawio",
+      "label": {
+        "en": "draw.io diagram",
+        "tr": "draw.io diyagramı"
+      },
+      "view": "editor",
+      "template": "filex/blank.xml"
+    }
+  ]
+}

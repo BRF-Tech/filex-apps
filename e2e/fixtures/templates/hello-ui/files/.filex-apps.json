@@ -1,0 +1,14 @@
+{
+  "publisher": "${PUBLISHER}",
+  "categories": ["productivity"],
+  "summary": { "en": "A tiny viewer the store's end-to-end tests publish (${VARIANT})." },
+  "description": "README.md",
+  "icon": "assets/icon.png",
+  "screenshots": [
+    { "path": "assets/screen-1.png", "caption": { "en": "The viewer with an .e2etxt file open" } }
+  ],
+  "conversions": [
+    { "from": ["e2etxt", "docx"], "to": ["pdf", "txt"] },
+    { "from": ["e2edoc"], "to": ["e2etxt"] }
+  ]
+}

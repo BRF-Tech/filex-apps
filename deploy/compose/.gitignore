@@ -1,0 +1,7 @@
+# A store's own settings and keys never go into a repository.
+.env
+keys.env
+*.env
+!.env.example
+branding/
+backups/

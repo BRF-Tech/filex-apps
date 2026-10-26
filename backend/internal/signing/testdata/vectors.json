@@ -1,0 +1,21 @@
+{
+  "comment": "ed25519 over the lower-hex sha256 of message (filex plugin.VerifyDetached scheme); generated with Node crypto, independent of the Go code",
+  "vectors": [
+    {
+      "name": "vector-1",
+      "seed_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "public_hex": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+      "message_hex": "7b22736368656d61223a312c2273657269616c223a317d0a",
+      "sha256_hex": "9dab148d58716067d820c513e5abdb55935f5a30c0739f04d043c9689c3fc737",
+      "signature_hex": "98dfca8e46d448e14ab6d8357fa7e3940d5dfa5a0541dfda1249f9131f7315274d55db67774462b50749151e5d3034104f96fff50450194d201edd2fd047f90b"
+    },
+    {
+      "name": "vector-2",
+      "seed_hex": "4242424242424242424242424242424242424242424242424242424242424242",
+      "public_hex": "2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12",
+      "message_hex": "00ff1080",
+      "sha256_hex": "a33bb2aed757bc839807d7a9deab0688c3cf06d36e53cb428f2e539c8dc76c5b",
+      "signature_hex": "33d8909c2de324ca61e8351bcd7f6354afbe03a0561b3ed5467c9ba8258880d3b608e4b9c6ce45e8a5d6a600042f7eff7831cdbd0721d89cf9daf1c31b2a3b02"
+    }
+  ]
+}

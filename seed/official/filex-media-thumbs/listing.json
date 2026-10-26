@@ -1,0 +1,14 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["media"],
+  "summary": {
+    "en": "Thumbnails and previews for Photoshop (.psd, .psb), Affinity (.af, .afphoto, .afdesign, .afpub) and Pixelmator Pro (.pxd) files, and for fonts (.ttf, .otf, .woff, .woff2)."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/thumbnails.png", "caption": {"en": "Fonts, a Pixelmator Pro, an Affinity and a Photoshop file with their thumbnails"}},
+    {"path": "screenshots/photoshop-preview.png", "caption": {"en": "A Photoshop file's preview: the merged image and what the file says"}},
+    {"path": "screenshots/font-preview.png", "caption": {"en": "A font's preview: sample text at six sizes, its weights and characters"}}
+  ]
+}

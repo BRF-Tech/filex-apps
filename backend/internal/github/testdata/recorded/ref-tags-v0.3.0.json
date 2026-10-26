@@ -1,0 +1,10 @@
+{
+  "ref": "refs/tags/v0.3.0",
+  "node_id": "REF_kwDOUqAOOrByZWZzL3RhZ3MvdjAuMy4w",
+  "url": "https://api.github.com/repos/BRF-Tech/filex-sign/git/refs/tags/v0.3.0",
+  "object": {
+    "sha": "aa85dd6a0139e45817cc95ea3d8beb5afe95fc7e",
+    "type": "tag",
+    "url": "https://api.github.com/repos/BRF-Tech/filex-sign/git/tags/aa85dd6a0139e45817cc95ea3d8beb5afe95fc7e"
+  }
+}

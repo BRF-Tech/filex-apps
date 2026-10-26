@@ -1,0 +1,4 @@
+{
+ "error": "manifest_invalid",
+ "message": "manifest: permission \"engines:office\": unknown engine (known: ffmpeg, ghostscript, imagemagick, libreoffice, poppler, rsvg)"
+}

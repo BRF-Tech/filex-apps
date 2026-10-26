@@ -1,0 +1,11 @@
+{
+  "github": [
+    { "id": 910101, "login": "e2e-pub-chromium", "name": "E2E Publisher Chromium", "email": "pub-chromium@e2e.test" },
+    { "id": 910102, "login": "e2e-pub-firefox", "name": "E2E Publisher Firefox", "email": "pub-firefox@e2e.test" },
+    { "id": 910103, "login": "e2e-pub-webkit", "name": "E2E Publisher WebKit", "email": "pub-webkit@e2e.test" },
+    { "id": 910199, "login": "e2e-outsider", "name": "E2E Outsider", "email": "outsider@e2e.test" },
+    { "id": 910201, "login": "e2e-admin", "name": "E2E Admin", "email": "admin@e2e.test" },
+    { "id": 910202, "login": "e2e-reviewer", "name": "E2E Reviewer", "email": "reviewer@e2e.test" },
+    { "id": 910203, "login": "e2e-nobody", "name": "E2E Nobody", "email": "nobody@e2e.test" }
+  ]
+}
