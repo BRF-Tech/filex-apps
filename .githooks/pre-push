@@ -103,6 +103,12 @@ check_one() {
   local local_ref=$1 local_sha=$2 remote_sha=$3
   local base range
 
+  # An annotated (signed) tag arrives as the tag object's id: check the
+  # commit it names. A tag of a commit already on main has nothing new.
+  local_sha=$(git rev-parse --verify -q "$local_sha^{commit}" 2>/dev/null) || {
+    say "$local_ref names no commit; nothing to check it against"
+    return 1
+  }
   if [ "$remote_sha" != "$zero" ] && git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
     base=$remote_sha
   else
