@@ -2,7 +2,7 @@
   "publisher": "brf-tech",
   "categories": ["documents", "productivity"],
   "summary": {
-    "en": "Edit Word, Excel and PowerPoint documents (and their OpenDocument kin) in filex with ONLYOFFICE's editor, in your browser and without a Document Server - alone or together with others, in encrypted folders too. Save writes a new version of the file."
+    "en": "Edit Word, Excel and PowerPoint documents and their kin in filex with ONLYOFFICE's editor, in your browser and without a Document Server - alone or together, in encrypted folders too. Since 0.4.0 it also brings filex a server engine for office thumbnails and conversions."
   },
   "description": "description.md",
   "icon": "icon.png",
@@ -11,7 +11,7 @@
     {"path": "screenshots/spreadsheet-dark.png", "caption": {"en": "A spreadsheet, in filex's dark theme"}},
     {"path": "screenshots/presentation.png", "caption": {"en": "A presentation"}},
     {"path": "screenshots/print.png", "caption": {"en": "Print: the editor hands filex a PDF, and filex asks before it opens the print dialog"}},
-    {"path": "screenshots/new-document.png", "caption": {"en": "New document gets a document, a spreadsheet and a presentation row"}},
+    {"path": "screenshots/new-document.png", "caption": {"en": "New document gets a document, a spreadsheet and a presentation, as OOXML and as OpenDocument"}},
     {"path": "screenshots/phone-reading.png", "caption": {"en": "On a phone the document opens to read, with Edit"}},
     {"path": "screenshots/phone-editing.png", "caption": {"en": "Edit on a phone: the editor, folded to its tabs"}}
   ]
