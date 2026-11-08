@@ -333,6 +333,29 @@ func TestBackoffGrowsAndIsCapped(t *testing.T) {
 	}
 }
 
+// A submission's jobs wait out an hour of GitHub (or a validator) not
+// answering before the submission fails, and the failure says so; the other
+// jobs keep five tries. Red before 0.1.1: five tries over 6.5 minutes, and
+// 2026-11-08's imports failed with resolve_error while GitHub's anonymous
+// downloads timed out for hours.
+func TestRetryWindow_TheSubmissionJobsWaitOutAnHourOfGitHub(t *testing.T) {
+	for _, kind := range []string{store.JobResolve, store.JobDryRun} {
+		n := store.MaxAttempts(kind)
+		if w := retryWindow(n); w < time.Hour || w > 70*time.Minute {
+			t.Errorf("%s: %d tries wait %v in all, want an hour or a little more", kind, n, w)
+		}
+	}
+	if store.MaxAttempts(store.JobPublishIndex) != 5 || store.MaxAttempts(store.JobNotifyDeliver) != 5 {
+		t.Error("the other jobs keep the table's five tries")
+	}
+	if got := gaveUp(9); got != "9 tries over about 65 minutes" {
+		t.Errorf("gaveUp(9) = %q", got)
+	}
+	if got := gaveUp(2); got != "2 tries over 10 seconds" {
+		t.Errorf("gaveUp(2) = %q", got)
+	}
+}
+
 type fakeAccess struct {
 	repo            *ghapi.Repo
 	check           domain.CheckResult

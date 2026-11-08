@@ -308,6 +308,11 @@ func (s *Service) CanSee(ctx context.Context, sub store.Submission, account int6
 // Withdraw ends a submission that is not decided yet (a member of its
 // publisher).
 func (s *Service) Withdraw(ctx context.Context, id int64, a Actor) (store.Submission, error) {
+	return s.withdraw(ctx, id, a, nil)
+}
+
+// withdraw is Withdraw; extra goes into the audit row's data.
+func (s *Service) withdraw(ctx context.Context, id int64, a Actor, extra map[string]any) (store.Submission, error) {
 	err := db.InTx(ctx, s.Pool, func(tx pgx.Tx) error {
 		sub, err := s.lockVisible(ctx, tx, id, a, false)
 		if err != nil {
@@ -322,7 +327,11 @@ func (s *Service) Withdraw(ctx context.Context, id int64, a Actor) (store.Submis
 		if _, err := store.CancelSubmissionJobs(ctx, tx, id); err != nil {
 			return err
 		}
-		_, err = audit.Append(ctx, tx, s.entry(a, "submission.withdraw", "submission", id, map[string]any{"from": sub.Status}))
+		data := map[string]any{"from": sub.Status}
+		for k, v := range extra {
+			data[k] = v
+		}
+		_, err = audit.Append(ctx, tx, s.entry(a, "submission.withdraw", "submission", id, data))
 		return err
 	})
 	if err != nil {

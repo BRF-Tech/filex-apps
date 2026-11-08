@@ -25,9 +25,18 @@
 # store's own binary does the work: the whole pipeline, then approval
 # and the signed index. A tag that fails a check stops the run with the
 # check's code and message; nothing about it is listed.
+#
+# FAPPS_IMPORT_TIMEOUT (25m, 2h; default the command's own, 2h) is how long
+# each import waits for the pipeline. When it passes, the import withdraws
+# its submission and the run stops: import the tag again later.
 set -euo pipefail
 
 container=${FAPPS_CONTAINER:-fapps-app}
+timeout_args=()
+if [ -n "${FAPPS_IMPORT_TIMEOUT:-}" ]; then
+  [[ "$FAPPS_IMPORT_TIMEOUT" =~ ^[0-9]+[smh]$ ]] || { echo "import.sh: FAPPS_IMPORT_TIMEOUT is a number and s, m or h" >&2; exit 2; }
+  timeout_args=(-timeout "$FAPPS_IMPORT_TIMEOUT")
+fi
 here=$(cd "$(dirname "$0")" && pwd)
 
 repo_of() {
@@ -97,5 +106,5 @@ docker cp "$here/$what" "$container:$dest"
 for tag in "$@"; do
   echo "== $repo $tag"
   docker exec "$container" /fapps-server import -publisher brf-tech -repo "$repo" -ref "$tag" \
-    -listing "$dest/listing.json" -approve
+    -listing "$dest/listing.json" ${timeout_args[@]+"${timeout_args[@]}"} -approve
 done

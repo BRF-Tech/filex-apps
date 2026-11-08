@@ -28,7 +28,22 @@ type Job struct {
 	MaxAttempts int
 }
 
-// Enqueue adds a job; runAfter zero means now.
+// MaxAttempts is how many times a job of the kind is tried before it fails
+// for good. A submission's jobs (resolve, dry_run) wait out an outage of
+// GitHub or of a validator: with the pipeline's backoff (10 s, times three,
+// at most 15 minutes) their ninth try comes about 65 minutes after the first
+// (GitHub's anonymous downloads failed for hours on 2026-11-08). Every other
+// kind keeps the table's default.
+func MaxAttempts(kind string) int {
+	switch kind {
+	case JobResolve, JobDryRun:
+		return 9
+	}
+	return 5
+}
+
+// Enqueue adds a job; runAfter zero means now. The job may be tried
+// MaxAttempts(kind) times.
 func Enqueue(ctx context.Context, q Q, kind string, payload any, runAfter time.Time) (int64, error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -36,8 +51,8 @@ func Enqueue(ctx context.Context, q Q, kind string, payload any, runAfter time.T
 	}
 	var id int64
 	err = q.QueryRow(ctx, `
-		INSERT INTO jobs (kind, payload, run_after) VALUES ($1, $2, COALESCE($3, now())) RETURNING id`,
-		kind, b, nullTime(runAfter)).Scan(&id)
+		INSERT INTO jobs (kind, payload, run_after, max_attempts) VALUES ($1, $2, COALESCE($3, now()), $4) RETURNING id`,
+		kind, b, nullTime(runAfter), MaxAttempts(kind)).Scan(&id)
 	return id, err
 }
 
@@ -101,6 +116,33 @@ func RequeueExpired(ctx context.Context, q Q) (int64, error) {
 			locked_by = NULL, locked_until = NULL, updated_at = now()
 		WHERE status = 'running' AND locked_until < now()`)
 	return tag.RowsAffected(), err
+}
+
+// Retrying is a submission's job that failed a try and waits for the next
+// one: what the operator import prints while it waits.
+type Retrying struct {
+	Kind      string
+	Attempts  int // tries made
+	Max       int
+	LastError string
+	Next      time.Time
+}
+
+// SubmissionRetrying is the newest queued job of the submission that has
+// failed a try; nil when there is none.
+func SubmissionRetrying(ctx context.Context, q Q, submissionID int64) (*Retrying, error) {
+	var r Retrying
+	err := q.QueryRow(ctx, `
+		SELECT kind, attempts, max_attempts, last_error, run_after FROM jobs
+		WHERE status = 'queued' AND attempts > 0 AND last_error IS NOT NULL AND payload ->> 'submission_id' = $1
+		ORDER BY id DESC LIMIT 1`, strconv.FormatInt(submissionID, 10)).Scan(&r.Kind, &r.Attempts, &r.Max, &r.LastError, &r.Next)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // CancelSubmissionJobs cancels the queued jobs of a submission.

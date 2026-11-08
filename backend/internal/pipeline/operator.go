@@ -232,6 +232,26 @@ func (s *Service) Import(ctx context.Context, in ImportRequest) (store.Submissio
 	return store.GetSubmission(ctx, s.Pool, id)
 }
 
+// AbandonImport withdraws an operator import the command stopped waiting for
+// (its -timeout passed, or it was interrupted), so the tag is not left in
+// the pipeline: nobody would approve it once it reached review, and every
+// later import of the tag would be refused while it stays open. Audited as
+// submission.withdraw with operator_import and why. A web submission is
+// refused (not_an_import); a decided one not_pending.
+func (s *Service) AbandonImport(ctx context.Context, id int64, a Actor, why string) (store.Submission, error) {
+	op, err := store.OperatorListing(ctx, s.Pool, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return store.Submission{}, refuse(NotFound, "not_found", "No such submission.")
+	}
+	if err != nil {
+		return store.Submission{}, err
+	}
+	if op == nil {
+		return store.Submission{}, refuse(Conflict, "not_an_import", "Submission %d is not an operator import.", id)
+	}
+	return s.withdraw(ctx, id, a, map[string]any{"operator_import": true, "why": why})
+}
+
 // operatorImport is the listing an operator import keeps with its
 // submission, with the publisher's standing as the database says now; nil
 // for a submission made through the web interface.

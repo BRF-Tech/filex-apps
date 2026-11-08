@@ -359,6 +359,8 @@ func TestDryRun_FailuresWorthRetrying(t *testing.T) {
 	ctx := context.Background()
 	for name, rep := range map[string]reply{
 		"filex could not reach GitHub": {502, []byte(`{"error":"fetch_failed","reason":"unreachable","message":"dial tcp: i/o timeout"}`)},
+		"GitHub answered filex 504":    {502, []byte(`{"error":"fetch_failed","reason":"http_status","status":504,"where":"https://github.com/BRF-Tech/filex-sign/releases/download/v0.3.0/plugin.wasm","message":"module: GET: 504"}`)},
+		"GitHub limited filex":         {502, []byte(`{"error":"fetch_failed","reason":"http_status","status":429,"message":"module: GET: 429"}`)},
 		"filex busy":                   {503, []byte(`{"error":"busy"}`)},
 		"filex failing":                {500, []byte(`{"error":"database is locked"}`)},
 		"a proxy in between":           {504, []byte(`gateway timeout`)},

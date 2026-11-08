@@ -387,7 +387,11 @@ func (r *Runner) call(ctx context.Context, in *instance, req domain.DryRunReques
 }
 
 // retryableAnswer: filex busy or failing, the seeded account refused, or
-// filex could not reach GitHub - not a judgement of the version.
+// filex could not get the release from GitHub - it could not reach it, or
+// GitHub answered a 5xx or 429 (filex's `reason` http_status with the
+// `status` it got; GitHub's anonymous downloads answered 504 for hours on
+// 2026-11-08) - not a judgement of the version. A 404 from GitHub stays a
+// verdict: the release does not have the file.
 func retryableAnswer(status int, body []byte) bool {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests,
@@ -397,10 +401,12 @@ func retryableAnswer(status int, body []byte) bool {
 	var e struct {
 		Error  string `json:"error"`
 		Reason string `json:"reason"`
+		Status int    `json:"status"`
 	}
 	_ = json.Unmarshal(body, &e)
 	if e.Error == "fetch_failed" {
-		return e.Reason == "unreachable"
+		return e.Reason == "unreachable" ||
+			(e.Reason == "http_status" && (e.Status >= 500 || e.Status == http.StatusTooManyRequests))
 	}
 	return status >= 500 && e.Error == ""
 }

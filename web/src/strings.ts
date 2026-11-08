@@ -1073,11 +1073,11 @@ export const S = {
     conformance_unverified: 'The plugin offers no /v1/selftest area, so none of its claims could be probed; the store lists only storage plugins that prove them.',
     conformance_failed: 'filex\'s conformance probes found a capability the plugin declares but does not deliver.',
     // the pipeline's own failures (Submission.failure.code)
-    resolve_error: 'The store could not finish reading the repository at this tag. Run the checks again.',
+    resolve_error: 'The store could not finish reading the repository at this tag: GitHub or the network kept failing for about an hour. Run the checks again later.',
     resolve_incomplete: 'Reading the repository stopped before every check had an answer. Run the checks again.',
     resolver_unavailable: 'The part of the store that reads repositories is not available right now. Run the checks again later.',
     resolution_unreadable: 'The store could not read back what it had resolved for this submission. Run the checks again.',
-    dry_run_error: 'A dry run on a filex validator ended in an error. Run the checks again.',
+    dry_run_error: 'A dry run on a filex validator kept ending in an error for about an hour (the validator, or GitHub serving it the release). Run the checks again later.',
     validator_unavailable: 'A filex validator did not answer. Run the checks again later.',
     // refusals of a submission itself (POST /api/v1/submissions)
     not_a_member: 'You are not a member of this publisher.',

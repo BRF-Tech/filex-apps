@@ -6,10 +6,26 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/brf-tech/filex-apps/backend/internal/media"
 	"github.com/brf-tech/filex-apps/backend/internal/resolve"
+	"github.com/brf-tech/filex-apps/backend/internal/store"
 )
+
+// While an import waits, a job's failed try is printed once: which job, the
+// try, when the next comes and why it failed. The default wait outlasts the
+// tries.
+func TestImportWait_SaysTheFailedTryAndOutlastsTheRetries(t *testing.T) {
+	line := retryLine(&store.Retrying{Kind: "resolve", Attempts: 2, Max: 9, LastError: "the artifacts check: http 504 from github.com",
+		Next: time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)})
+	if line != "  resolve: try 2 of 9 failed, the next at 2026-11-08T12:00:00Z: the artifacts check: http 504 from github.com" {
+		t.Errorf("%q", line)
+	}
+	if importTimeout < 90*time.Minute {
+		t.Errorf("the import waits %v by default, less than the jobs keep trying", importTimeout)
+	}
+}
 
 func writeFiles(t *testing.T, dir string, files map[string]string) {
 	t.Helper()

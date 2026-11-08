@@ -496,3 +496,63 @@ func TestPublisherProfile_ReadWhenThePublisherBecomesActive(t *testing.T) {
 		t.Errorf("a failing reader: %+v %v", got, err)
 	}
 }
+
+// An import the command stops waiting for (GitHub not serving the release,
+// its -timeout, an interrupt) is withdrawn: the tag is not left half way in
+// the pipeline, and the next import of it runs. While it waits, the job's
+// failed try is what the command prints. Red before 0.1.1: the command gave
+// up after 30 minutes and left the submission open, so the next import of
+// the tag was refused while nobody would approve the first one.
+func TestOperatorImport_AnImportGivenUpIsWithdrawnAndCanComeAgain(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.officialBRFTech(t)
+	in := pipeline.ImportRequest{Actor: w.op, Publisher: "brf-tech", Repo: demoRepo, Ref: "v1.0.0", Listing: listing("brf-tech")}
+	sub, err := w.svc.Import(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := store.Claim(ctx, w.pool, []string{store.JobResolve}, "test", time.Minute)
+	if err != nil || job == nil {
+		t.Fatalf("claim: %+v %v", job, err)
+	}
+	if job.MaxAttempts != 9 {
+		t.Errorf("a resolve job may be tried %d times, want 9 (about an hour of backoff)", job.MaxAttempts)
+	}
+	if err := store.RetryJob(ctx, w.pool, job.ID, "the artifacts check: the module from https://github.com/x: http 504 from github.com", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	r, err := store.SubmissionRetrying(ctx, w.pool, sub.ID)
+	if err != nil || r == nil || r.Kind != store.JobResolve || r.Attempts != 1 || r.Max != 9 || !strings.Contains(r.LastError, "http 504") ||
+		time.Until(r.Next) < 50*time.Minute {
+		t.Fatalf("retrying %+v %v", r, err)
+	}
+	if _, err := w.svc.Import(ctx, in); refusalCode(err) != "submission_open" {
+		t.Errorf("an open import holds the tag: %v", err)
+	}
+
+	got, err := w.svc.AbandonImport(ctx, sub.ID, w.op, "submission is still queued after 25m0s")
+	if err != nil || got.Status != "withdrawn" {
+		t.Fatalf("abandon: %+v %v", got, err)
+	}
+	if r, err := store.SubmissionRetrying(ctx, w.pool, sub.ID); err != nil || r != nil {
+		t.Errorf("a withdrawn submission's job is cancelled: %+v %v", r, err)
+	}
+	a := auditData(t, w.pool, "submission.withdraw")
+	if why, _ := a["why"].(string); a["operator_import"] != true || a["from"] != "queued" || !strings.Contains(why, "25m0s") {
+		t.Errorf("audit %v", a)
+	}
+	if _, err := w.svc.AbandonImport(ctx, sub.ID, w.op, "again"); refusalCode(err) != "not_pending" {
+		t.Errorf("a withdrawn submission again: %v", err)
+	}
+
+	again, err := w.svc.Import(ctx, in)
+	if err != nil {
+		t.Fatalf("the tag again: %v", err)
+	}
+	w.drain(t)
+	again, _ = store.GetSubmission(ctx, w.pool, again.ID)
+	if again.Status != "needs_review" {
+		t.Errorf("the second import: %s %s %s", again.Status, again.FailureCode, again.FailureMessage)
+	}
+}

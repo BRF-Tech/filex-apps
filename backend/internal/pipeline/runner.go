@@ -227,6 +227,28 @@ func backoff(attempts int) time.Duration {
 	return d
 }
 
+// retryWindow is how long a job that was tried attempts times waited between
+// its tries: the backoffs before tries 2 to attempts.
+func retryWindow(attempts int) time.Duration {
+	var d time.Duration
+	for i := 1; i < attempts; i++ {
+		d += backoff(i)
+	}
+	return d
+}
+
+// gaveUp says, for a final failure message, how long the tries went on.
+func gaveUp(attempts int) string {
+	return fmt.Sprintf("%d tries over %s", attempts, aboutMinutes(retryWindow(attempts)))
+}
+
+func aboutMinutes(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d seconds", int(d.Round(time.Second)/time.Second))
+	}
+	return fmt.Sprintf("about %d minutes", int(d.Round(time.Minute)/time.Minute))
+}
+
 // settle completes a job, or retries it (with backoff) or fails it.
 func (r *Runner) settle(ctx context.Context, job *store.Job, err error) error {
 	if err == nil {
@@ -310,7 +332,8 @@ func (r *Runner) resolve(ctx context.Context, job *store.Job) error {
 			return store.RetryJob(ctx, r.Pool, job.ID, rerr.Error(), backoff(job.Attempts))
 		}
 		r.failInfra(ctx, sub, strs(domain.SubResolving, domain.SubQueued), "resolve_error",
-			"The repository could not be read: "+rerr.Error())
+			"The repository could not be read: "+gaveUp(job.Attempts)+" failed on GitHub's side or the network's, the last with: "+
+				rerr.Error()+". Nothing was listed; retry the submission once GitHub answers again.")
 		return store.FailJob(ctx, r.Pool, job.ID, rerr.Error())
 	}
 
@@ -408,7 +431,8 @@ func (r *Runner) dryRun(ctx context.Context, job *store.Job) error {
 			return store.RetryJob(ctx, r.Pool, job.ID, derr.Error(), backoff(job.Attempts))
 		}
 		r.failInfra(ctx, sub, strs(domain.SubValidating), "dry_run_error",
-			"The validators could not be asked: "+derr.Error())
+			"The validators could not be asked: "+gaveUp(job.Attempts)+" failed (a validator down, or GitHub not serving it the release), the last with: "+
+				derr.Error()+". Nothing was listed; retry the submission once they answer again.")
 		return store.FailJob(ctx, r.Pool, job.ID, derr.Error())
 	}
 	checks = EnforcePins(&res, results, checks, time.Now(), r.Permissions)

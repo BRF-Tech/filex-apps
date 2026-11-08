@@ -6,14 +6,17 @@ package main
 //	fapps-server publisher -id <id> -name <name> -github-owner <login> [-homepage <url>]
 //	    makes the publisher bound to the GitHub owner's numeric id (as GitHub
 //	    answers it now) active, verified and official, creating it if needed.
-//	fapps-server import -publisher <id> -repo <owner/name> -ref <tag> -listing <file> [-approve] [-note <text>] [-timeout 30m]
+//	fapps-server import -publisher <id> -repo <owner/name> -ref <tag> -listing <file> [-approve] [-note <text>] [-timeout 2h]
 //	    queues an operator import: the listing file has the .filex-apps.json
 //	    schema, its paths (description, icon, screenshots) are files next to
 //	    it. The server's workers run the whole pipeline (resolve, policy,
 //	    artifacts, media, the dry runs on every validator, the pins); the
 //	    command waits, prints every check and, with -approve, approves a
 //	    submission that reached review (which signs the version and publishes
-//	    the index).
+//	    the index). While a job waits for its next try (GitHub or a
+//	    validator not answering) it prints the try and the error. When
+//	    -timeout passes, or the command is interrupted, it withdraws the
+//	    submission, so the tag can be imported again later.
 //	fapps-server conversions -app <name> -version <version> -listing <file>
 //	    sets the conversions an approved version of an official publisher's
 //	    app declares to the listing file's `conversions` (the
@@ -83,7 +86,7 @@ import (
 
 const operatorUsage = `usage:
   fapps-server publisher -id <id> -name <name> -github-owner <login> [-homepage <url>]
-  fapps-server import -publisher <id> -repo <owner/name> -ref <tag> -listing <file> [-kind app|storage] [-approve] [-note <text>] [-timeout 30m]
+  fapps-server import -publisher <id> -repo <owner/name> -ref <tag> -listing <file> [-kind app|storage] [-approve] [-note <text>] [-timeout 2h]
   fapps-server conversions -app <name> -version <version> -listing <file>
   fapps-server publish-index
   fapps-server notify-webhook -login <github login> -name <name> -format generic|slack|discord|teams -url <url> [-header-name <name>] [-events all|<kind>,...] [-test]
@@ -133,7 +136,7 @@ func operator(cmd string, args []string, stdout, stderr io.Writer) int {
 		note := fs.String("note", "", "note kept with the submission")
 		kind := fs.String("kind", "app", "app (an app or a language pack) or storage (a storage plugin)")
 		approve := fs.Bool("approve", false, "approve when every check passed")
-		timeout := fs.Duration("timeout", 30*time.Minute, "how long to wait for the pipeline")
+		timeout := fs.Duration("timeout", importTimeout, "how long to wait for the pipeline; then the submission is withdrawn")
 		required = []*string{pubID, repo, ref, listing}
 		run = func(ctx context.Context, o *ops) error {
 			l, err := loadListing(*listing, o.cfg.Fetch.MaxMedia)
@@ -302,9 +305,10 @@ func (o *ops) importOne(ctx context.Context, in pipeline.ImportRequest, approve 
 		return refusalErr(err)
 	}
 	fmt.Fprintf(out, "submission %d: %s at %s queued (%s)\n", sub.ID, sub.Repo, sub.Ref, pipeline.OperatorConsent)
-	sub, err = waitDecidable(ctx, o.pool, sub.ID, timeout)
+	id := sub.ID
+	sub, err = waitDecidable(ctx, o.pool, id, timeout, out)
 	if err != nil {
-		return err
+		return o.abandon(id, actor, err, out)
 	}
 	checks, err := store.ChecksOf(ctx, o.pool, sub.ID, sub.Attempt)
 	if err != nil {
@@ -374,10 +378,17 @@ func orNone(s string) string {
 	return s
 }
 
+// importTimeout is how long an import waits by default: longer than a
+// submission's jobs keep trying while GitHub or a validator does not answer
+// (store.MaxAttempts: about 65 minutes of backoff), with room for the work.
+const importTimeout = 2 * time.Hour
+
 // waitDecidable polls until the submission leaves the pipeline's automated
-// steps (the server's workers run them).
-func waitDecidable(ctx context.Context, pool *pgxpool.Pool, id int64, timeout time.Duration) (store.Submission, error) {
+// steps (the server's workers run them), printing each failed try a job
+// waits to repeat.
+func waitDecidable(ctx context.Context, pool *pgxpool.Pool, id int64, timeout time.Duration, out io.Writer) (store.Submission, error) {
 	deadline := time.Now().Add(timeout)
+	said := ""
 	for {
 		sub, err := store.GetSubmission(ctx, pool, id)
 		if err != nil {
@@ -388,8 +399,14 @@ func waitDecidable(ctx context.Context, pool *pgxpool.Pool, id int64, timeout ti
 		default:
 			return sub, nil
 		}
+		if r, err := store.SubmissionRetrying(ctx, pool, id); err == nil && r != nil {
+			if line := retryLine(r); line != said {
+				fmt.Fprintln(out, line)
+				said = line
+			}
+		}
 		if time.Now().After(deadline) {
-			return sub, fmt.Errorf("submission %d is still %s after %s (the server's workers run it; it stays queued)", id, sub.Status, timeout)
+			return sub, fmt.Errorf("submission %d is still %s after %s", id, sub.Status, timeout)
 		}
 		select {
 		case <-ctx.Done():
@@ -397,6 +414,35 @@ func waitDecidable(ctx context.Context, pool *pgxpool.Pool, id int64, timeout ti
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+// retryLine is what the import prints for a job that waits for its next try.
+func retryLine(r *store.Retrying) string {
+	return fmt.Sprintf("  %s: try %d of %d failed, the next at %s: %s", r.Kind, r.Attempts, r.Max,
+		r.Next.UTC().Format(time.RFC3339), r.LastError)
+}
+
+// abandon withdraws a submission the command stopped waiting for (why: the
+// timeout or the interrupt), so the tag is not left half way in the
+// pipeline, and answers why with what became of the submission.
+func (o *ops) abandon(id int64, actor pipeline.Actor, why error, out io.Writer) error {
+	if id == 0 {
+		return why
+	}
+	if errors.Is(why, context.Canceled) {
+		why = errors.New("interrupted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	last := ""
+	if r, err := store.SubmissionRetrying(ctx, o.pool, id); err == nil && r != nil {
+		last = "; the last try: " + r.LastError
+	}
+	if _, err := o.svc.AbandonImport(ctx, id, actor, why.Error()); err != nil {
+		return fmt.Errorf("%v%s; withdrawing it failed (%v): withdraw submission %d before importing the tag again", why, last, refusalErr(err), id)
+	}
+	fmt.Fprintf(out, "submission %d withdrawn: the tag can be imported again\n", id)
+	return fmt.Errorf("%v%s; withdrawn, nothing was listed: import the tag again later", why, last)
 }
 
 func printChecks(out io.Writer, checks []domain.CheckResult) {
