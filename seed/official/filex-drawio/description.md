@@ -9,6 +9,7 @@ serves draw.io's own files from the app's package and runs them in a sandboxed f
 reads and saves only the file it was opened with, and loads its translations, shapes and templates
 from its own package only.
 
-The version number follows draw.io's (31.5.3). This app is MIT-licensed; draw.io is Apache 2.0.
+The version number follows draw.io's: each version of the app is the draw.io release of the same
+number. This app is MIT-licensed; draw.io is Apache 2.0.
 
 Source and issues: [github.com/BRF-Tech/filex-drawio](https://github.com/BRF-Tech/filex-drawio).

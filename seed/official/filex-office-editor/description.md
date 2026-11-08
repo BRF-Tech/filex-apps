@@ -45,9 +45,10 @@ engine once after the install, in the background, a few minutes; **Default apps 
 shows when it is ready.
 
 The editor itself runs in your browser: its files come from ONLYOFFICE's official Document Server
-image (ONLYOFFICE Docs 9.4.0), and documents are converted for it in your browser by the same x2t,
-which the project builds from ONLYOFFICE core 9.4.0. filex serves the app's package and runs it in
-a sandboxed frame; the app reads and saves only the file it was opened with.
+image, and documents are converted for it in your browser by the same x2t, which the project builds
+from the ONLYOFFICE core release that matches that image (each version's release notes name it).
+filex serves the app's package and runs it in a sandboxed frame; the app reads and saves only the
+file it was opened with.
 
 Needs filex 0.57 or later; on filex 0.56 the store offers 0.3.1, which edits the six OOXML and
 OpenDocument kinds and brings no engine, and on filex 0.55 0.1.1. The app's own texts are in
