@@ -17,9 +17,31 @@
 //   - GET /repos/{o}/{r}/license?ref=<commit> honours the ref (a commit
 //     without a license file is a 404), so the license is read at the tag's
 //     commit, not on the default branch.
+//
+// With the server token, the background reads of files and release assets
+// go through the REST API instead of the anonymous web hosts (measured
+// 2026-11-08 with a fine-grained, public-read token):
+//
+//   - GET /repos/{o}/{r}/contents/{path}?ref=<commit> with Accept
+//     application/vnd.github.raw+json answers the file's bytes (the same
+//     bytes raw.githubusercontent.com serves) with that content type; a
+//     directory answers its listing as application/json; a missing file 404.
+//   - GET /repos/{o}/{r}/releases/tags/{tag} lists the release's assets with
+//     their ids (a missing release 404); GET /repos/{o}/{r}/releases/assets/{id}
+//     with Accept application/octet-stream answers 302 to the same
+//     release-assets.githubusercontent.com address the web download goes to.
+//     The token stays on api.github.com: the HTTP client drops Authorization
+//     on a redirect to another host.
+//
+// On 2026-11-08 GitHub's web downloads (github.com/<o>/<r>/releases/download)
+// timed out or answered 504 for unauthenticated clients for hours ("Increase
+// in timeouts for some unauthenticated users") while the authenticated API
+// answered. Without a token, or when GitHub refuses or limits the token, the
+// reads are the anonymous ones, as before.
 package github
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -105,12 +127,22 @@ func Retryable(err error) bool {
 
 // Client reads GitHub. Safe for concurrent use.
 type Client struct {
-	http  *safehttp.Client
-	api   string
-	raw   string
-	web   string
-	token string
+	http    *safehttp.Client
+	api     string
+	raw     string
+	web     string
+	webHost string
+	token   string
+	wait    []time.Duration
 }
+
+// DefaultRetryWait are the waits between the tries of one background read
+// that failed in a way worth retrying (a 5xx, a timeout, a dropped
+// connection): three tries in all, so an intermittent failure does not cost
+// the whole resolution. A rate limit is not retried here (its reset is
+// minutes away: the pipeline's backoff waits for it), nor anything GitHub
+// answered about the repository.
+var DefaultRetryWait = []time.Duration{2 * time.Second, 6 * time.Second}
 
 // Options builds a Client.
 type Options struct {
@@ -124,8 +156,13 @@ type Options struct {
 	// default GitHub's own. Tests point it at a fake.
 	WebURL string
 	// Token is the server's own read token (FAPPS_GITHUB_TOKEN), used when a
-	// call is not given the user's; empty means anonymous.
+	// call is not given the user's; empty means anonymous. With it, files at
+	// a commit and release assets are read through the REST API (the
+	// package comment).
 	Token string
+	// RetryWait are the waits between the tries of one background read (nil:
+	// DefaultRetryWait; empty: one try). Tests pass short ones.
+	RetryWait []time.Duration
 }
 
 // DefaultWebURL is GitHub's own web host (release downloads).
@@ -134,7 +171,7 @@ const DefaultWebURL = "https://github.com"
 // New builds a Client.
 func New(o Options) *Client {
 	c := &Client{http: o.HTTP, api: strings.TrimRight(o.APIURL, "/"), raw: strings.TrimRight(o.RawURL, "/"),
-		web: strings.TrimRight(o.WebURL, "/"), token: o.Token}
+		web: strings.TrimRight(o.WebURL, "/"), token: o.Token, wait: o.RetryWait}
 	if c.api == "" {
 		c.api = DefaultAPIURL
 	}
@@ -144,8 +181,18 @@ func New(o Options) *Client {
 	if c.web == "" {
 		c.web = DefaultWebURL
 	}
+	if u, err := url.Parse(c.web); err == nil {
+		c.webHost = strings.ToLower(u.Host)
+	}
+	if c.wait == nil {
+		c.wait = DefaultRetryWait
+	}
 	return c
 }
+
+// Authenticated reports whether the background reads carry the server's
+// token (FAPPS_GITHUB_TOKEN).
+func (c *Client) Authenticated() bool { return c.token != "" }
 
 // ReleaseAssetURL is the address of a file attached to the release of a tag:
 // the address filex reads a storage plugin's feed from when it installs "from
@@ -157,24 +204,124 @@ func (c *Client) ReleaseAssetURL(owner, name, tag, file string) string {
 // ReleaseAsset reads a small file attached to the release of a tag (a
 // storage plugin's filex-storage.json), at most max bytes. A release or a
 // file that is not there is ErrNotFound; a larger file safehttp.ErrTooLarge.
+// File.URL is the web address (the one filex reads), whichever way it was
+// read.
 func (c *Client) ReleaseAsset(ctx context.Context, owner, name, tag, file string, max int64) (*File, error) {
 	u := c.ReleaseAssetURL(owner, name, tag, file)
-	b, err := c.http.Get(ctx, u, max, nil)
+	var buf bytes.Buffer
+	var a *Asset
+	err := c.try(ctx, func() error {
+		buf.Reset()
+		var err error
+		a, err = c.download(ctx, u, max, &buf)
+		return err
+	}, nil)
+	if errors.Is(err, ErrNotFound) {
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, file)
+	}
 	if err != nil {
-		var se *safehttp.StatusError
-		if errors.As(err, &se) && se.Code == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %s", ErrNotFound, file)
-		}
 		return nil, err
 	}
-	return &File{URL: u, Bytes: b.Bytes, SHA256: b.SHA256}, nil
+	return &File{URL: u, Bytes: buf.Bytes(), SHA256: a.SHA256}, nil
 }
 
 // DownloadTo streams an allow-listed address into w and into sha256, at most
 // max bytes (a storage plugin's build, for the plugin validator). A 404 is
-// ErrNotFound. Nothing is kept but what w keeps.
+// ErrNotFound. Nothing is kept but what w keeps. A failed try is repeated
+// only while w has received nothing.
 func (c *Client) DownloadTo(ctx context.Context, rawURL string, max int64, w io.Writer) (*Asset, error) {
-	d, err := c.http.CopyTo(ctx, rawURL, max, w)
+	cw := &countingWriter{w: w}
+	var a *Asset
+	err := c.try(ctx, func() error {
+		var err error
+		a, err = c.download(ctx, rawURL, max, cw)
+		return err
+	}, func() bool { return cw.n == 0 })
+	return a, err
+}
+
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// try runs one background read, and again after each of c.wait while it
+// fails in a way worth retrying in the call (retryInCall) and again() (nil:
+// always) allows it. It answers the last try's error.
+func (c *Client) try(ctx context.Context, read func() error, again func() bool) error {
+	err := read()
+	for _, d := range c.wait {
+		if err == nil || !retryInCall(err) || ctx.Err() != nil || (again != nil && !again()) {
+			return err
+		}
+		t := time.NewTimer(d)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return err
+		case <-t.C:
+		}
+		err = read()
+	}
+	return err
+}
+
+// retryInCall: worth another try at once - Retryable, except a rate limit
+// (GitHub's 403/429 with a reset, a download host's 429), whose reset is the
+// pipeline's to wait for.
+func retryInCall(err error) bool {
+	var rl *RateLimitError
+	if errors.As(err, &rl) {
+		return false
+	}
+	var ae *APIError
+	if errors.As(err, &ae) && ae.Status == http.StatusTooManyRequests {
+		return false
+	}
+	var se *safehttp.StatusError
+	if errors.As(err, &se) && se.Code == http.StatusTooManyRequests {
+		return false
+	}
+	return Retryable(err)
+}
+
+// Via says how an asset was read.
+const (
+	// ViaAPI: through the REST API with the server's token
+	// (GET /repos/{o}/{r}/releases/assets/{id}).
+	ViaAPI = "api"
+	// ViaWeb: from the address itself, anonymously.
+	ViaWeb = "web"
+)
+
+// errUseWeb: GitHub refused or limited the server's token for an API read
+// that stands in for an anonymous one; the caller makes the anonymous read.
+var errUseWeb = errors.New("the server token cannot be used for this read")
+
+// download reads one address into sha256 (and w when not nil): a release
+// asset on GitHub's web host through the REST API when the server has a
+// token, anything else (and a release asset when the token is refused or
+// limited) from the address itself.
+func (c *Client) download(ctx context.Context, rawURL string, max int64, w io.Writer) (*Asset, error) {
+	if ref, ok := c.releaseDownload(rawURL); ok && c.token != "" {
+		a, err := c.downloadAPI(ctx, ref, rawURL, max, w)
+		if !errors.Is(err, errUseWeb) {
+			return a, err
+		}
+	}
+	var d *safehttp.Digest
+	var err error
+	if w != nil {
+		d, err = c.http.CopyTo(ctx, rawURL, max, w, nil)
+	} else {
+		d, err = c.http.Hash(ctx, rawURL, max, nil)
+	}
 	if err != nil {
 		var se *safehttp.StatusError
 		if errors.As(err, &se) && se.Code == http.StatusNotFound {
@@ -182,7 +329,182 @@ func (c *Client) DownloadTo(ctx context.Context, rawURL string, max int64, w io.
 		}
 		return nil, err
 	}
-	return &Asset{URL: rawURL, SHA256: d.SHA256, Size: d.Size, Hops: d.Hops}, nil
+	return &Asset{URL: rawURL, SHA256: d.SHA256, Size: d.Size, Hops: d.Hops, Via: ViaWeb}, nil
+}
+
+// releaseRef is a release download address taken apart: the asset file of
+// the release of tag ("" for the repository's latest release).
+type releaseRef struct {
+	owner, name, tag, file string
+}
+
+// releaseDownload reads https://<web host>/<o>/<r>/releases/download/<tag>/<file>
+// and .../releases/latest/download/<file>. Anything else (another host, a
+// query, a tag with a slash) is not one: it is read from the address itself.
+func (c *Client) releaseDownload(raw string) (releaseRef, bool) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "https" || c.webHost == "" || !strings.EqualFold(u.Host, c.webHost) ||
+		u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return releaseRef{}, false
+	}
+	segs := strings.Split(strings.TrimPrefix(u.EscapedPath(), "/"), "/")
+	for i, s := range segs {
+		if segs[i], err = url.PathUnescape(s); err != nil || segs[i] == "" || strings.Contains(segs[i], "/") {
+			return releaseRef{}, false
+		}
+	}
+	var r releaseRef
+	switch {
+	case len(segs) == 6 && segs[2] == "releases" && segs[3] == "download":
+		r = releaseRef{owner: segs[0], name: segs[1], tag: segs[4], file: segs[5]}
+	case len(segs) == 6 && segs[2] == "releases" && segs[3] == "latest" && segs[4] == "download":
+		r = releaseRef{owner: segs[0], name: segs[1], file: segs[5]}
+	default:
+		return releaseRef{}, false
+	}
+	if !ownerRe.MatchString(r.owner) || !nameRe.MatchString(r.name) {
+		return releaseRef{}, false
+	}
+	return r, true
+}
+
+func (c *Client) repoBase(owner, name string) string {
+	return "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(name)
+}
+
+// downloadAPI reads a release asset through the REST API: the release by its
+// tag (or the latest), the asset's id by its name, then the asset endpoint
+// with Accept application/octet-stream, which redirects to the asset host
+// (the token is not sent there). errUseWeb when GitHub refuses or limits the
+// token; ErrNotFound when the release or the asset is not there.
+func (c *Client) downloadAPI(ctx context.Context, ref releaseRef, rawURL string, max int64, w io.Writer) (*Asset, error) {
+	id, err := c.assetID(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	u := c.api + c.repoBase(ref.owner, ref.name) + "/releases/assets/" + strconv.FormatInt(id, 10)
+	hdr := c.apiHeader("application/octet-stream")
+	var d *safehttp.Digest
+	if w != nil {
+		d, err = c.http.CopyTo(ctx, u, max, w, hdr)
+	} else {
+		d, err = c.http.Hash(ctx, u, max, hdr)
+	}
+	if err != nil {
+		return nil, c.apiStatus(err, ref.file)
+	}
+	return &Asset{URL: rawURL, SHA256: d.SHA256, Size: d.Size, Hops: d.Hops, Via: ViaAPI}, nil
+}
+
+type releaseAssets struct {
+	ID     int64 `json:"id"`
+	Assets []struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	} `json:"assets"`
+}
+
+// assetID finds the asset named ref.file in the release. A release lists its
+// assets; when it lists 100 or more the list is read page by page too.
+func (c *Client) assetID(ctx context.Context, ref releaseRef) (int64, error) {
+	base := c.repoBase(ref.owner, ref.name)
+	path := base + "/releases/latest"
+	if ref.tag != "" {
+		path = base + "/releases/tags/" + url.PathEscape(ref.tag)
+	}
+	var rel releaseAssets
+	if err := c.serverAPI(ctx, path, &rel); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return 0, fmt.Errorf("%w: no release %s in %s/%s", ErrNotFound, orLatest(ref.tag), ref.owner, ref.name)
+		}
+		return 0, err
+	}
+	for _, a := range rel.Assets {
+		if a.Name == ref.file {
+			return a.ID, nil
+		}
+	}
+	for page := 1; len(rel.Assets) >= 100 && page <= 10; page++ {
+		var list []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		}
+		if err := c.serverAPI(ctx, fmt.Sprintf("%s/releases/%d/assets?per_page=100&page=%d", base, rel.ID, page), &list); err != nil {
+			return 0, err
+		}
+		for _, a := range list {
+			if a.Name == ref.file {
+				return a.ID, nil
+			}
+		}
+		if len(list) < 100 {
+			break
+		}
+	}
+	return 0, fmt.Errorf("%w: %s is not an asset of the release %s of %s/%s", ErrNotFound, ref.file, orLatest(ref.tag), ref.owner, ref.name)
+}
+
+func orLatest(tag string) string {
+	if tag == "" {
+		return "latest"
+	}
+	return tag
+}
+
+// serverAPI GETs an API path with the server's token into v, for a read that
+// stands in for an anonymous one: errUseWeb when GitHub refuses or limits the
+// token (the caller then makes the anonymous read), ErrNotFound for a 404.
+func (c *Client) serverAPI(ctx context.Context, path string, v any) error {
+	status, hdr, body, err := c.apiDo(ctx, c.token, path)
+	if err != nil {
+		return err
+	}
+	switch {
+	case status == http.StatusOK:
+		if err := json.Unmarshal(body, v); err != nil {
+			return &APIError{Status: status, Message: "unreadable answer: " + err.Error()}
+		}
+		return nil
+	case status == http.StatusNotFound:
+		return ErrNotFound
+	case tokenUnusable(status, hdr, body):
+		return errUseWeb
+	default:
+		return &APIError{Status: status, Message: apiMessage(body)}
+	}
+}
+
+// tokenUnusable: GitHub refused the token itself (revoked, expired, an
+// owner's policy) or limited it. Either way an anonymous read can still
+// answer for public data.
+func tokenUnusable(status int, hdr http.Header, body []byte) bool {
+	return rateLimited(status, hdr) || credentialsRefused(status, body) ||
+		(status == http.StatusForbidden && TokenRefusedByPolicy(body))
+}
+
+// apiHeader is an API request's headers with the server's token.
+func (c *Client) apiHeader(accept string) http.Header {
+	return http.Header{"Accept": {accept}, "X-Github-Api-Version": {"2022-11-28"}, "Authorization": {"Bearer " + c.token}}
+}
+
+// apiStatus sorts what the guarded client answered for an API address read
+// with the server's token: errUseWeb when the token was refused or limited,
+// ErrNotFound for a 404, an APIError for GitHub's other answers (a 5xx is
+// worth retrying). An answer from the host a redirect went to, and any other
+// error, comes back as it is.
+func (c *Client) apiStatus(err error, what string) error {
+	var se *safehttp.StatusError
+	if !errors.As(err, &se) || !strings.HasPrefix(se.URL, c.api+"/") {
+		return err
+	}
+	switch {
+	case se.Code == http.StatusNotFound:
+		return fmt.Errorf("%w: %s", ErrNotFound, what)
+	case tokenUnusable(se.Code, se.Header, se.Body):
+		return errUseWeb
+	default:
+		return &APIError{Status: se.Code, Message: apiMessage(se.Body)}
+	}
 }
 
 var (
@@ -464,10 +786,40 @@ type File struct {
 	SHA256 string
 }
 
-// FileAt reads path at commit (raw, not an API call), at most max bytes. A
-// missing file is ErrNotFound; a larger one safehttp.ErrTooLarge.
+// FileAt reads path at commit, at most max bytes: with the server's token
+// through the REST API (GET /repos/{o}/{r}/contents/{path}?ref=<commit>, the
+// raw media type), else - and when GitHub refuses or limits the token - from
+// the raw host. A missing file (or a directory) is ErrNotFound; a larger one
+// safehttp.ErrTooLarge. File.URL is the raw address either way: the same
+// bytes, at the address filex reads.
 func (c *Client) FileAt(ctx context.Context, owner, name, commit, path string, max int64) (*File, error) {
+	var f *File
+	err := c.try(ctx, func() error {
+		var err error
+		f, err = c.fileAt(ctx, owner, name, commit, path, max)
+		return err
+	}, nil)
+	return f, err
+}
+
+func (c *Client) fileAt(ctx context.Context, owner, name, commit, path string, max int64) (*File, error) {
 	u := c.RawURL(owner, name, commit, path)
+	if c.token != "" {
+		api := c.api + c.repoBase(owner, name) + "/contents/" + escapeRefPath(strings.TrimPrefix(path, "/")) + "?ref=" + url.QueryEscape(commit)
+		b, err := c.http.Get(ctx, api, max, c.apiHeader("application/vnd.github.raw+json"))
+		if err == nil {
+			// The raw media type answers a file's bytes; a directory comes
+			// back as its JSON listing, which raw.githubusercontent.com answers
+			// with a 404: not a file either way.
+			if !strings.HasPrefix(strings.ToLower(b.ContentType), "application/vnd.github.raw") {
+				return nil, fmt.Errorf("%w: %s (not a file)", ErrNotFound, path)
+			}
+			return &File{URL: u, Bytes: b.Bytes, SHA256: b.SHA256}, nil
+		}
+		if err = c.apiStatus(err, path); !errors.Is(err, errUseWeb) {
+			return nil, err
+		}
+	}
 	b, err := c.http.Get(ctx, u, max, nil)
 	if err != nil {
 		var se *safehttp.StatusError
@@ -481,29 +833,41 @@ func (c *Client) FileAt(ctx context.Context, owner, name, commit, path string, m
 
 // Asset is a streamed download (a module, an interface bundle).
 type Asset struct {
+	// URL is the address as the manifest names it (the one filex
+	// downloads), whichever way the store read it.
 	URL    string
 	SHA256 string
 	Size   int64
 	// Hops are the redirects followed (queries dropped).
 	Hops []string
+	// Via is ViaAPI (a release asset through the REST API with the server's
+	// token) or ViaWeb (the address itself, anonymously).
+	Via string `json:",omitempty"`
 }
 
 // Download streams a release asset (or any allow-listed address) into
 // sha256, at most max bytes. A 404 is ErrNotFound.
 func (c *Client) Download(ctx context.Context, rawURL string, max int64) (*Asset, error) {
-	d, err := c.http.Hash(ctx, rawURL, max)
-	if err != nil {
-		var se *safehttp.StatusError
-		if errors.As(err, &se) && se.Code == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %s", ErrNotFound, rawURL)
-		}
-		return nil, err
-	}
-	return &Asset{URL: rawURL, SHA256: d.SHA256, Size: d.Size, Hops: d.Hops}, nil
+	var a *Asset
+	err := c.try(ctx, func() error {
+		var err error
+		a, err = c.download(ctx, rawURL, max, nil)
+		return err
+	}, nil)
+	return a, err
 }
 
-// apiGet GETs an API path into v.
+// apiGet GETs an API path into v. A background read (no person's token) is
+// tried again on a failure worth it (try); a person's read is not: they are
+// waiting for the answer and can ask again.
 func (c *Client) apiGet(ctx context.Context, token, path string, v any) error {
+	if token != "" {
+		return c.apiGetOnce(ctx, token, path, v)
+	}
+	return c.try(ctx, func() error { return c.apiGetOnce(ctx, "", path, v) }, nil)
+}
+
+func (c *Client) apiGetOnce(ctx context.Context, token, path string, v any) error {
 	server := token == ""
 	if server {
 		token = c.token

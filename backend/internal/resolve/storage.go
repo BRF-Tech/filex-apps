@@ -509,7 +509,7 @@ func (x *run) fetchPinned(what, u, want, pinnedBy string, max int64, data map[st
 	case errors.Is(err, safehttp.ErrTooManyRedirects), errors.Is(err, github.ErrNotFound):
 		return nil, CodeFetchFailed, "the " + what + " could not be downloaded from " + u + ": " + err.Error(), nil
 	case err != nil && retryable(err):
-		return nil, "", "", err
+		return nil, "", "", fmt.Errorf("the %s from %s: %w", what, u, err)
 	case err != nil:
 		return nil, CodeFetchFailed, "the " + what + " could not be downloaded from " + u + ": " + err.Error(), nil
 	}

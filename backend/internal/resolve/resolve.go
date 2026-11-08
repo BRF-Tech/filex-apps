@@ -181,7 +181,9 @@ func (x *run) check(kind domain.CheckKind, fn func() (status domain.CheckStatus,
 	start := x.r.now().UTC()
 	status, code, msg, data, err := fn()
 	if err != nil {
-		return false, err
+		// Worth retrying: the pipeline's final message says which check and
+		// which read kept failing.
+		return false, fmt.Errorf("the %s check: %w", kind, err)
 	}
 	end := x.r.now().UTC()
 	c := domain.CheckResult{Kind: kind, Status: status, Code: code, Message: msg, StartedAt: start, EndedAt: &end}

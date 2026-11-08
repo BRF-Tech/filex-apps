@@ -257,7 +257,7 @@ func (f *fake) resolver(t *testing.T, ms *sink, lim Limits) *Resolver {
 	pool.AddCert(f.srv.Certificate())
 	u, _ := url.Parse(f.srv.URL)
 	hc := safehttp.New(safehttp.Config{AllowHosts: []string{u.Host}, RootCAs: pool, Addresses: func(netip.Addr) error { return nil }})
-	gh := github.New(github.Options{HTTP: hc, APIURL: f.srv.URL, RawURL: f.srv.URL})
+	gh := github.New(github.Options{HTTP: hc, APIURL: f.srv.URL, RawURL: f.srv.URL, RetryWait: []time.Duration{time.Millisecond, time.Millisecond}})
 	clock := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 	o := Options{GitHub: gh, Limits: lim, Now: func() time.Time { return clock }}
 	if ms != nil {
@@ -412,8 +412,13 @@ func TestResolve_RepositoryAccess(t *testing.T) {
 		}
 	}
 
-	// GitHub failing is the pipeline's to retry, not a check.
-	f.failRepo = 1
+	// GitHub failing is tried again in the call (three tries), then it is
+	// the pipeline's to retry, not a check.
+	f.failRepo = 2
+	if _, checks, err = r.Resolve(ctx, req("")); err != nil || statuses(checks) != "repo_access=passed tag=passed manifest=passed consent=passed artifacts=passed media=passed" {
+		t.Errorf("two 5xx, then the answer: %v %s", err, statuses(checks))
+	}
+	f.failRepo = 3
 	_, checks, err = r.Resolve(ctx, req(""))
 	if err == nil || len(checks) != 0 || !github.Retryable(err) {
 		t.Errorf("5xx: %v %s", err, statuses(checks))

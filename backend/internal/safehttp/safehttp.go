@@ -61,11 +61,19 @@ var (
 	ErrBadURL           = errors.New("not a valid address")
 )
 
-// StatusError is a non-2xx answer.
+// StatusError is a non-2xx answer. Header and the first bytes of Body (at
+// most MaxErrorBody) are kept so a caller can read the server's reason: the
+// GitHub API says in them whether it refused a token, limited the caller or
+// failed.
 type StatusError struct {
-	Code int
-	URL  string
+	Code   int
+	URL    string
+	Header http.Header
+	Body   []byte
 }
+
+// MaxErrorBody is how much of a non-2xx answer's body StatusError keeps.
+const MaxErrorBody = 4 << 10
 
 func (e *StatusError) Error() string {
 	return fmt.Sprintf("http %d from %s", e.Code, hostOf(e.URL))
@@ -390,9 +398,10 @@ type Digest struct {
 	Hops   []string
 }
 
-// Hash streams raw into sha256, refusing more than max bytes.
-func (c *Client) Hash(ctx context.Context, raw string, max int64) (*Digest, error) {
-	resp, err := c.get(ctx, raw, max, nil)
+// Hash streams raw into sha256, refusing more than max bytes. hdr adds
+// request headers (nil for none).
+func (c *Client) Hash(ctx context.Context, raw string, max int64, hdr http.Header) (*Digest, error) {
+	resp, err := c.get(ctx, raw, max, hdr)
 	if err != nil {
 		return nil, err
 	}
@@ -411,9 +420,10 @@ func (c *Client) Hash(ctx context.Context, raw string, max int64) (*Digest, erro
 // CopyTo streams raw into w and into sha256, refusing more than max bytes:
 // what Hash does, for a caller that keeps the bytes (a storage plugin's
 // build handed to the plugin validator). On ErrTooLarge w has received up
-// to max+1 bytes; the caller discards them.
-func (c *Client) CopyTo(ctx context.Context, raw string, max int64, w io.Writer) (*Digest, error) {
-	resp, err := c.get(ctx, raw, max, nil)
+// to max+1 bytes; the caller discards them. hdr adds request headers (nil
+// for none).
+func (c *Client) CopyTo(ctx context.Context, raw string, max int64, w io.Writer, hdr http.Header) (*Digest, error) {
+	resp, err := c.get(ctx, raw, max, hdr)
 	if err != nil {
 		return nil, err
 	}
@@ -448,8 +458,9 @@ func (c *Client) get(ctx context.Context, raw string, max int64, hdr http.Header
 		return nil, err
 	}
 	if resp.StatusCode/100 != 2 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, MaxErrorBody))
 		resp.Body.Close()
-		return nil, &StatusError{Code: resp.StatusCode, URL: redact(resp.Request.URL)}
+		return nil, &StatusError{Code: resp.StatusCode, URL: redact(resp.Request.URL), Header: resp.Header, Body: body}
 	}
 	if resp.ContentLength > max {
 		resp.Body.Close()

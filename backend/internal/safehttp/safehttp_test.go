@@ -195,7 +195,7 @@ func TestGet_RefusesOversizedBodiesNeverTruncates(t *testing.T) {
 		if _, err := c.Get(context.Background(), l.a.URL+p, 10, nil); !errors.Is(err, ErrTooLarge) {
 			t.Errorf("Get %s: %v", p, err)
 		}
-		if _, err := c.Hash(context.Background(), l.a.URL+p, 10); !errors.Is(err, ErrTooLarge) {
+		if _, err := c.Hash(context.Background(), l.a.URL+p, 10, nil); !errors.Is(err, ErrTooLarge) {
 			t.Errorf("Hash %s: %v", p, err)
 		}
 		if b, err := c.Get(context.Background(), l.a.URL+p, 11, nil); err != nil || len(b.Bytes) != 11 {
@@ -208,7 +208,7 @@ func TestHash_StreamsTheDigestAndSize(t *testing.T) {
 	payload := strings.Repeat("filex", 200000)
 	l := newLab(t, ok(payload), ok("b"))
 	c := l.client([]string{l.hostport(l.a)}, true)
-	d, err := c.Hash(context.Background(), l.a.URL+"/plugin.wasm", 1<<20)
+	d, err := c.Hash(context.Background(), l.a.URL+"/plugin.wasm", 1<<20, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

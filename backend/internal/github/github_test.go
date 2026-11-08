@@ -62,6 +62,7 @@ func newFake(t *testing.T) (*fakeGitHub, *Client) {
 		"/repos/o/slash/git/ref/tags/release/1.0":                                      []byte(`{"ref":"refs/tags/release/1.0","object":{"sha":"4444444444444444444444444444444444444444","type":"commit"}}`),
 		"/BRF-Tech/filex-sign/" + signCommit + "/filex-app.json":                       []byte(`{"name":"sign"}`),
 		"/BRF-Tech/filex-sign/" + signCommit + "/docs/README.md":                       []byte("# Sign\n"),
+		"/o/revoked/" + signCommit + "/f.json":                                         []byte(`{"read":"from the raw host"}`),
 		"/releases/download/v0.3.0/plugin.wasm":                                        []byte("\x00asm\x01\x00\x00\x00"),
 		"/users/BRF-Tech":                                                              []byte(`{"login":"BRF-Tech","id":159972728,"type":"Organization","site_admin":false}`),
 		"/users/no-id":                                                                 []byte(`{"login":"no-id","type":"User"}`),
@@ -129,6 +130,14 @@ func newFake(t *testing.T) (*fakeGitHub, *Client) {
 			}
 			_, _ = w.Write([]byte(`{"id":78,"name":"revoked","full_name":"o/revoked","owner":{"id":6,"login":"o","type":"User"},"private":false,"visibility":"public"}`))
 			return
+		case "/repos/o/revoked/contents/f.json":
+			// The server's token refused while it reads a file: the raw host
+			// answers for a public repository.
+			if r.Header.Get("Authorization") != "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"message":"Bad credentials","status":"401"}`))
+				return
+			}
 		case "/repos/o/policy":
 			// GitHub's answer on 2026-10-04 when the BRF-Tech organization
 			// refused the store's fine-grained token (lifetime over 366 days).
@@ -140,6 +149,24 @@ func newFake(t *testing.T) (*fakeGitHub, *Client) {
 			}
 			_, _ = w.Write([]byte(`{"id":77,"name":"policy","full_name":"o/policy","owner":{"id":5,"login":"o","type":"Organization"},"private":false}`))
 			return
+		}
+		// The contents API with the raw media type: the file's bytes, as the
+		// raw host serves them (measured 2026-11-08); a directory is listed
+		// as JSON.
+		if o, rest, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, "/repos/"), "/"); ok && strings.HasPrefix(r.URL.Path, "/repos/") {
+			if n, path, ok := strings.Cut(rest, "/contents/"); ok && !strings.Contains(n, "/") {
+				key := "/" + o + "/" + n + "/" + r.URL.Query().Get("ref") + "/" + path
+				if b, ok := routes[key]; ok && strings.HasPrefix(r.Header.Get("Accept"), "application/vnd.github.raw") {
+					w.Header().Set("Content-Type", "application/vnd.github.raw+json; charset=utf-8")
+					_, _ = w.Write(b)
+					return
+				}
+				if path == "docs" {
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					_, _ = w.Write([]byte(`[{"name":"README.md","path":"docs/README.md","type":"file"}]`))
+					return
+				}
+			}
 		}
 		if b, ok := routes[r.URL.Path]; ok {
 			_, _ = w.Write(b)
@@ -157,7 +184,7 @@ func newFake(t *testing.T) (*fakeGitHub, *Client) {
 		RootCAs:    pool,
 		Addresses:  func(netip.Addr) error { return nil },
 	})
-	return f, New(Options{HTTP: hc, APIURL: f.srv.URL, RawURL: f.srv.URL, Token: "server-token"})
+	return f, New(Options{HTTP: hc, APIURL: f.srv.URL, RawURL: f.srv.URL, Token: "server-token", RetryWait: fastRetry})
 }
 
 func (f *fakeGitHub) lastAuth(prefix string) string {
@@ -211,7 +238,7 @@ func TestRepository_PermissionsAreTheCallersRole(t *testing.T) {
 		t.Errorf("permissions %+v: admin must be able to list", r.Permissions)
 	}
 
-	anon := New(Options{HTTP: c.http, APIURL: c.api, RawURL: c.raw})
+	anon := New(Options{HTTP: c.http, APIURL: c.api, RawURL: c.raw, RetryWait: fastRetry})
 	r, err = anon.Repository(ctx, "", "BRF-Tech", "filex-sign")
 	if err != nil {
 		t.Fatal(err)
@@ -303,25 +330,51 @@ func TestResolveTag_PeelsAnnotatedTagsAndRefusesBranches(t *testing.T) {
 	}
 }
 
+// The same reads with the server's token (the contents API) and without one
+// (the raw host): the same bytes, the raw address as File.URL either way.
 func TestFileAt_ReadsAtTheCommitWithACap(t *testing.T) {
-	_, c := newFake(t)
+	f, server := newFake(t)
+	anon := New(Options{HTTP: server.http, APIURL: server.api, RawURL: server.raw, RetryWait: fastRetry})
 	ctx := context.Background()
-	f, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "filex-app.json", 1024)
-	if err != nil {
-		t.Fatal(err)
+	for _, c := range []*Client{server, anon} {
+		file, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "filex-app.json", 1024)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256([]byte(`{"name":"sign"}`))
+		if string(file.Bytes) != `{"name":"sign"}` || file.SHA256 != hex.EncodeToString(sum[:]) || file.URL != c.raw+"/BRF-Tech/filex-sign/"+signCommit+"/filex-app.json" {
+			t.Errorf("file %+v", file)
+		}
+		if file, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "/docs/README.md", 1024); err != nil || string(file.Bytes) != "# Sign\n" {
+			t.Errorf("nested path: %v", err)
+		}
+		if _, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, ".filex-apps.json", 1024); !errors.Is(err, ErrNotFound) {
+			t.Errorf("missing file: %v", err)
+		}
+		if _, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "docs", 1024); !errors.Is(err, ErrNotFound) {
+			t.Errorf("a directory is not a file: %v", err)
+		}
+		if _, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "filex-app.json", 4); !errors.Is(err, safehttp.ErrTooLarge) {
+			t.Errorf("over the cap: %v", err)
+		}
 	}
-	sum := sha256.Sum256([]byte(`{"name":"sign"}`))
-	if string(f.Bytes) != `{"name":"sign"}` || f.SHA256 != hex.EncodeToString(sum[:]) || !strings.HasSuffix(f.URL, "/BRF-Tech/filex-sign/"+signCommit+"/filex-app.json") {
-		t.Errorf("file %+v", f)
+	if got := f.lastAuth("/repos/BRF-Tech/filex-sign/contents/filex-app.json"); got != "Bearer server-token" {
+		t.Errorf("with the server token the file is read through the API, Authorization %q", got)
 	}
-	if f, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "/docs/README.md", 1024); err != nil || string(f.Bytes) != "# Sign\n" {
-		t.Errorf("nested path: %v", err)
+	if got := f.lastAuth("/BRF-Tech/filex-sign/" + signCommit + "/filex-app.json"); got != "" {
+		t.Errorf("the raw host read sent Authorization %q", got)
 	}
-	if _, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, ".filex-apps.json", 1024); !errors.Is(err, ErrNotFound) {
-		t.Errorf("missing file: %v", err)
+	// GitHub refusing the server's token is no answer about the file: the
+	// raw host is read, anonymously.
+	file, err := server.FileAt(ctx, "o", "revoked", signCommit, "f.json", 1024)
+	if err != nil || string(file.Bytes) != `{"read":"from the raw host"}` {
+		t.Fatalf("a refused token: %+v %v", file, err)
 	}
-	if _, err := c.FileAt(ctx, "BRF-Tech", "filex-sign", signCommit, "filex-app.json", 4); !errors.Is(err, safehttp.ErrTooLarge) {
-		t.Errorf("over the cap: %v", err)
+	if got := f.lastAuth("/repos/o/revoked/contents/f.json"); got != "Bearer server-token" {
+		t.Errorf("the API was asked first, Authorization %q", got)
+	}
+	if got := f.lastAuth("/o/revoked/" + signCommit + "/f.json"); got != "" {
+		t.Errorf("the raw read after the refusal sent Authorization %q", got)
 	}
 }
 
