@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { MOCK, sha256Hex, validators } from '../support';
 
-// The validators are real filex instances (0.56.0 "latest", 0.55.0 "floor").
+// The validators are real filex instances (the images docker-compose.yml
+// names: the newest release "latest", the previous minor "floor").
 // Before the store's pipeline asks them anything, this proves the wiring the
 // pipeline relies on: each one signs the seeded admin in, reaches "GitHub"
 // (the mock on 127.0.0.1:443 inside its namespace, over HTTPS with the run's

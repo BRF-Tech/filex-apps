@@ -1,7 +1,7 @@
 //go:build integration
 
-// Integration tests against REAL filex validators (ghcr.io/brf-tech/filex
-// v0.56.0 and v0.55.0), run on a test machine by
+// Integration tests against REAL filex validators (ghcr.io/brf-tech/filex:
+// the newest release and the previous minor), run on a test machine by
 // scripts/xcheck/validators-it.sh, which starts both and sets:
 //
 //	FAPPS_IT_VALIDATORS=latest=http://127.0.0.1:5212,floor=http://127.0.0.1:5213

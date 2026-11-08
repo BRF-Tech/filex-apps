@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Integration tests of backend/internal/validator against two REAL filex
-# validators: ghcr.io/brf-tech/filex v0.57.3 ("latest") and v0.56.0
+# validators: ghcr.io/brf-tech/filex v0.59.0 ("latest") and v0.58.0
 # ("floor"), the versions docs/ARCHITECTURE.md Q7 names (the same image
 # lines as docker-compose.yml; LATEST_IMAGE / FLOOR_IMAGE override them for
 # one run).
@@ -48,8 +48,8 @@ validator() {
     -e FILEX_PLUGINS_DISABLED=1 -e FILEX_APP_PLUGINS_DISABLED=0 -e FILEX_PLUGIN_LOOPBACK_SOURCES=1 \
     "$image" >/dev/null
 }
-validator "$LATEST" "${LATEST_IMAGE:-ghcr.io/brf-tech/filex:v0.57.3}" 127.0.0.1:5212 ""
-validator "$FLOOR" "${FLOOR_IMAGE:-ghcr.io/brf-tech/filex:v0.56.0}" 127.0.0.1:5213 "--network container:$LATEST"
+validator "$LATEST" "${LATEST_IMAGE:-ghcr.io/brf-tech/filex:v0.59.0}" 127.0.0.1:5212 ""
+validator "$FLOOR" "${FLOOR_IMAGE:-ghcr.io/brf-tech/filex:v0.58.0}" 127.0.0.1:5213 "--network container:$LATEST"
 
 caches=()
 [ -n "${GOMODCACHE_DIR:-}" ] && caches+=(-v "$GOMODCACHE_DIR:/go/pkg/mod")
