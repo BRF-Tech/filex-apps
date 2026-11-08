@@ -93,7 +93,9 @@ FAPPS_GITHUB_CLIENT_SECRET=...            # a secret
 ```
 
 **Optional, recommended:** a token for the store's own GitHub reads (the pipeline, publishers'
-avatars). Without it they share GitHub's anonymous limit, 60 requests an hour per address. A
+avatars). With it the pipeline reads the repository's files and the release assets through GitHub's
+REST API; without it they are anonymous downloads, which share GitHub's anonymous limit (60 API
+requests an hour per address) and which GitHub has failed for hours while the API answered. A
 fine-grained personal access token with **public repositories, read-only** and no other permission;
 an organization may refuse tokens that live long (keep its lifetime within the policy, or the store
 repeats such reads anonymously). `FAPPS_GITHUB_TOKEN=...` in `.env`.
@@ -343,7 +345,7 @@ operator sets:
 | `FAPPS_ADMIN_REPO` | none | | a private repository whose collaborators are the staff (`write` and above: administrator, `triage`: reviewer) |
 | `FAPPS_ADMIN_TOKEN` | | **yes** | the token that reads `FAPPS_ADMIN_REPO`'s permissions (fine-grained, that repository only, Metadata: read) |
 | `FAPPS_GITHUB_CLIENT_ID`, `FAPPS_GITHUB_CLIENT_SECRET` | | the secret | the GitHub OAuth App |
-| `FAPPS_GITHUB_TOKEN` | | **yes** | optional: public read-only token for the store's GitHub reads |
+| `FAPPS_GITHUB_TOKEN` | | **yes** | optional, recommended: public read-only token for the store's GitHub reads (files and release assets through the REST API) |
 | `FAPPS_INDEX_KEY`, `FAPPS_ARTIFACT_KEY`, `FAPPS_LICENSE_KEY` (+ `_KEY_ID`) | | **yes** | the signing keys (`keygen`) |
 | `FAPPS_DATA_KEY`, `FAPPS_SESSION_KEY` | | **yes** | the data and session keys (`keygen`); `FAPPS_DATA_KEY` is never changed on a store with data |
 | `FAPPS_VAPID_PUBLIC_KEY`, `FAPPS_VAPID_PRIVATE_KEY` | | the private key | the Web Push pair (`keygen`); without it browser notifications are off |

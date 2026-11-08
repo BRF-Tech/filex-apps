@@ -68,6 +68,7 @@ administrator checks before trusting it
 | [docs/DEPLOY.md](docs/DEPLOY.md) | keeping it running: new versions, rollback, checks, keys, the validators at each filex release, the plugin validator, the operator commands, the generated data files, building and testing |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | how the store works and why: identity and roles, the pipeline, the index, signatures, licensing, install links, file-type search, notifications, security, configuration |
 | [api/openapi.yaml](api/openapi.yaml) | the HTTP contract (where it and a document disagree, the contract is right) |
+| [CHANGELOG.md](CHANGELOG.md) | what each release changed, and whether it has a migration |
 | [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) | how to contribute; how to report a vulnerability |
 
 ## Repository layout

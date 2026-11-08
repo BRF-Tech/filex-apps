@@ -383,12 +383,32 @@ publisher and the reviewer see, with a machine code and a sentence.
 
 **Mechanics.** Jobs in Postgres (`jobs`), claimed with `FOR UPDATE SKIP LOCKED`, at most one dry run
 per validator at a time (a large module compiles for tens of seconds in filex), per-job time limit
-(resolve 5 minutes, dry run 4 minutes per validator), retries with backoff for network errors only. A
-check that fails is final for that attempt; **retry** starts a new attempt (the tag is resolved again,
-so a moved tag is caught). The GitHub token of the submitter is used only in step 1 (synchronously,
-in `POST /submissions`); background work uses `FAPPS_GITHUB_TOKEN` if set, else anonymous reads (raw
-and release downloads are not API calls; the API reads cost three calls per resolution, so anonymous
-reads allow about 20 resolutions an hour: set the token).
+(resolve 5 minutes, dry run 4 minutes per validator), retries with backoff for failures that are not
+an answer about the version: GitHub's 5xx, rate limits and timeouts, the network, a validator that
+does not answer, and a validator that GitHub did not serve the release to (filex's `fetch_failed`
+with `unreachable`, or `http_status` and a 5xx or 429; a 404 stays a verdict). A submission's jobs
+are tried up to nine times (`store.MaxAttempts`), 10 s apart and then three times longer each time up
+to 15 minutes: the ninth try comes about 65 minutes after the first, so an outage of GitHub's of tens
+of minutes delays a submission without failing it (on 2026-11-08 GitHub's anonymous downloads timed
+out for hours, and five tries over 6.5 minutes failed four imports). After the last try the
+submission fails with `resolve_error` or `dry_run_error`, a message that says how many tries over how
+long and the last error, and the administrators' `pipeline.error` notification. Each background read
+of GitHub is also tried three times in the call (2 s and 6 s apart; not a rate limit), so an
+intermittent failure does not cost the whole attempt. A check that fails is final for that attempt;
+**retry** starts a new attempt (the tag is resolved again, so a moved tag is caught).
+
+The GitHub token of the submitter is used only in step 1 (synchronously, in `POST /submissions`).
+Background work uses `FAPPS_GITHUB_TOKEN` if set: the API reads (three calls per resolution), and
+also the files at the commit (the manifest, `.filex-apps.json`, the description, the images: `GET
+/repos/{o}/{r}/contents/{path}?ref=<commit>` with the raw media type) and the release assets the
+manifest names on `github.com` (`.../releases/download/<tag>/<file>` and
+`.../releases/latest/download/<file>`: the release by its tag, the asset's id, then `GET
+/repos/{o}/{r}/releases/assets/{id}` with `Accept: application/octet-stream`, which redirects to the
+asset host without the token). The bytes are the ones the anonymous addresses serve, and the
+addresses recorded are those (the ones filex downloads). Without the token, and for any read whose
+token GitHub refuses (revoked, expired, an owner's policy) or limits, the reads are anonymous: the
+raw host and the release download addresses, and the API at 60 calls an hour per address (about 20
+resolutions an hour). Set the token.
 
 ### Storage plugins
 
@@ -1223,7 +1243,7 @@ reported by `/readyz` (the server still answers `/healthz`).
 | `FAPPS_ANALYTICS_ORIGIN` | empty | | an optional page counter's origin, `https://host[:port]` and nothing else (e.g. `https://stats.example.com`); anything else stops the server. Set: the page's CSP adds it to `script-src` and `connect-src`, so a counter script the reverse proxy puts into the page loads and reports. The store prints no counter script itself. Empty: the CSP allows no other origin |
 | `FAPPS_SESSION_KEY` | | **yes** | 32+ random bytes, base64; cookie signing and token sealing. Required outside `development`; without it the sign-in is closed |
 | `FAPPS_GITHUB_CLIENT_ID` / `_SECRET` | | secret: yes | the GitHub OAuth App (publishers' sign-in) |
-| `FAPPS_GITHUB_TOKEN` | | **yes** | optional read-only token for background GitHub reads (public read only, never a write scope) |
+| `FAPPS_GITHUB_TOKEN` | | **yes** | optional, recommended: read-only token for background GitHub reads (public read only, never a write scope); with it the files at a commit and the release assets are read through the REST API ([Mechanics](#submission-pipeline)) |
 | `FAPPS_GITHUB_OAUTH_URL` | `https://github.com` | | GitHub's sign-in host; only tests and the e2e stack's mock change it |
 | `FAPPS_GITHUB_API_URL` | `https://api.github.com` | | GitHub's REST API; same |
 | `FAPPS_GITHUB_RAW_URL` | `https://raw.githubusercontent.com` | | where files are read at a commit; same |

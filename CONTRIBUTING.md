@@ -42,6 +42,8 @@ request (`.github/workflows/ci.yml`).
 - A test for every change, shown failing on the code before the change and
   passing after it.
 - Migrations are forward-only and additive: never edit one that has run.
+- A change someone running a store notices (behaviour, a setting, a
+  migration) gets a line in the next section of [CHANGELOG.md](CHANGELOG.md).
 - No secrets, tokens or the host names of a real deployment in code, tests or
   documents; use `example.com` addresses and made-up people (alice, bob).
 - Every table in the web interface is filex's `DataTable`, every colour a

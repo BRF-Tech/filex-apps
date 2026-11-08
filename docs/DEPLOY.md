@@ -32,7 +32,8 @@ store container's name in place of `app` (`docker exec <container> ...`).
    (`docker build --build-arg VERSION=<commit> -t <your registry>/filex-apps:<commit> .`, the context
    from `git archive <commit>` rather than a working tree, so nothing uncommitted gets in). Never a
    moving tag such as `latest` in production: `/healthz` reports the version, and a rollback needs
-   the previous one by name.
+   the previous one by name. [CHANGELOG.md](../CHANGELOG.md) says what each release changes and
+   whether it has a migration.
 2. A dump first:
    `docker compose exec -T postgres pg_dump -U fapps --clean --if-exists fapps | gzip > backups/pre-<version>.sql.gz`.
 3. The new version in `.env` (`FAPPS_VERSION`), then
@@ -94,7 +95,7 @@ the repository. `fapps-server keygen` makes the store's own keys in one go
 | `FAPPS_SESSION_KEY` | cookie signing and GitHub token sealing, 32+ random bytes, base64 | a new one signs everybody out, nothing else |
 | `FAPPS_VAPID_PRIVATE_KEY` (+ `FAPPS_VAPID_PUBLIC_KEY`) | the Web Push key pair of the browser notifications | a new pair makes every browser turn its notifications on again; without it they are off and the webhooks work |
 | `FAPPS_GITHUB_CLIENT_SECRET` | the GitHub OAuth App's secret | make a new one on GitHub |
-| `FAPPS_GITHUB_TOKEN`, `FAPPS_ADMIN_TOKEN` | the optional background-read token; the role check's token when the roles come from a repository | make new ones on GitHub |
+| `FAPPS_GITHUB_TOKEN`, `FAPPS_ADMIN_TOKEN` | the background-read token (optional, recommended: with it the pipeline reads files and release assets through GitHub's REST API, which kept answering on 2026-11-08 while GitHub's anonymous downloads timed out for hours; ARCHITECTURE.md, "Mechanics"); the role check's token when the roles come from a repository | make new ones on GitHub; until then the reads are anonymous |
 | the database password | `FAPPS_DB_PASSWORD` in the example compose | change it in Postgres and `.env` together |
 
 Not secrets: the validators' password (`FAPPS_VALIDATOR_PASSWORD`: it guards filex instances that
@@ -252,7 +253,12 @@ docker compose exec app /fapps-server import -publisher acme -repo acme-org/acme
 (creating it if needed). `import` queues the tag like any submission, waits for the workers, prints
 every check and, with `-approve`, approves it as the operator account (which signs the version and
 publishes the index). A tag that fails a check is not listed; the command exits with the check's code
-and message. Import the tags of one app oldest first, so the newest is the last one approved and the
+and message. While a job waits for its next try (GitHub or a validator not answering: the jobs keep
+trying for about an hour, ARCHITECTURE.md "Mechanics") the command prints the try and its error. It
+waits at most `-timeout` (default `2h`); when that passes, or the command is interrupted, it
+**withdraws** the submission (audited `submission.withdraw` with `operator_import`) and exits 1, so
+the tag is not left in the pipeline, where nobody would approve it and every later import of it
+would be refused: import it again later. Import the tags of one app oldest first, so the newest is the last one approved and the
 app's listing follows it. A listing folder holds `listing.json` (the `.filex-apps.json`
 [schema](../schema/filex-apps.schema.json)), `description.md`, `icon.png` and `screenshots/`, its
 paths relative to the folder.
@@ -272,6 +278,7 @@ FAPPS_CONTAINER=<the store's container> bash seed/official/import.sh publisher
 FAPPS_CONTAINER=<the store's container> bash seed/official/import.sh filex-sign v0.1.1 v0.2.0 v0.3.0
 ```
 
+`FAPPS_IMPORT_TIMEOUT=<duration>` (`25m`, `2h`) passes `-timeout` to each import.
 `import.sh <folder> <tag>...` copies the folder into the container, under a new name every run
 (`/tmp/fapps-seed-<folder>-<time>-<pid>`: `docker cp` onto a directory that exists would put the new
 copy inside the old one, whose listing the import would then read), and runs `import ... -approve`
@@ -307,16 +314,17 @@ The catalog's file-type search says what filex does with a kind before any app i
 embedded in the server and generated from one filex tag by
 [`scripts/gen-filex-builtin.mjs`](../scripts/gen-filex-builtin.mjs); it is never edited by hand.
 It reads a filex checkout with `git show <tag>:<path>` only (nothing is checked out), so any clone
-with the tag will do. It is plain Node (no packages).
+of [BRF-Tech/filex](https://github.com/BRF-Tech/filex) with the tag will do (the file records the
+tag's commit there). It is plain Node (no packages).
 
 ```sh
-node scripts/gen-filex-builtin.mjs /path/to/filex v0.57.3 --check   # is the committed file what the tag says?
-node scripts/gen-filex-builtin.mjs /path/to/filex v0.58.0           # write it for another release
+node scripts/gen-filex-builtin.mjs /path/to/filex v0.59.0 --check   # is the committed file what the tag says?
+node scripts/gen-filex-builtin.mjs /path/to/filex v0.60.0           # write it for another release
 ```
 
 - **When**: with each filex release, together with the validators' image tags, so the panel speaks
   for the filex people install. The file records `filex`, `tag` and `commit`, and the page names that
-  version ("What filex 0.57.3 does with no app installed").
+  version ("What filex 0.59.0 does with no app installed").
 - **When it stops**: every list comes from one named place in filex (the preview's viewers and its
   Edit button, the server's rule of how a file is edited, the kinds ONLYOFFICE also opens, the
   thumbnail engine, the archive providers, the New menu, the settings, the default image's tools;
