@@ -1,7 +1,7 @@
 {
-  "filex": "0.57.3",
-  "tag": "v0.57.3",
-  "commit": "6ca679fbe5d5bb5b4434ddcb69f865d63aae586f",
+  "filex": "0.59.0",
+  "tag": "v0.59.0",
+  "commit": "43a8ce92a9a0484494c76d516630593acb226e03",
   "generated_by": "scripts/gen-filex-builtin.mjs",
   "engines": {
     "office": {
@@ -2497,22 +2497,22 @@
     {
       "what": "setting: the ONLYOFFICE Document Server",
       "path": "backend/internal/config/config.go",
-      "lines": "1630"
+      "lines": "1649"
     },
     {
       "what": "setting: the ONLYOFFICE secret",
       "path": "backend/internal/config/config.go",
-      "lines": "1639"
+      "lines": "1658"
     },
     {
       "what": "setting: the draw.io server",
       "path": "backend/internal/config/config.go",
-      "lines": "1645"
+      "lines": "1664"
     },
     {
       "what": "setting: 7-Zip",
       "path": "backend/internal/config/config.go",
-      "lines": "1454"
+      "lines": "1473"
     },
     {
       "what": "the tools in filex's default image",
