@@ -58,7 +58,7 @@ Based on ONLYOFFICE Docs by Ascensio System SIA; this version may have been modi
 ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio System SIA;
 this app is not affiliated with or endorsed by Ascensio System SIA. The app is free software under
 the GNU AGPL version 3 or later; in the editor, **About this editor** (the ⓘ in its corner) shows
-this notice and the link to the source of the version you run.
+this notice and the address of the source of the version you run, as text to copy.
 
 Source and issues:
 [github.com/BRF-Tech/filex-office-editor](https://github.com/BRF-Tech/filex-office-editor).
