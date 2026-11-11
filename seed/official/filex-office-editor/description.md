@@ -54,9 +54,11 @@ Needs filex 0.57 or later; on filex 0.56 the store offers 0.3.1, which edits the
 OpenDocument kinds and brings no engine, and on filex 0.55 0.1.1. The app's own texts are in
 English and Turkish; the editor speaks the languages ONLYOFFICE ships.
 
-Based on ONLYOFFICE Docs by Ascensio System SIA. ONLYOFFICE® and ONLYOFFICE Docs™ are registered
-trademarks or trademarks of Ascensio System SIA; this app is not affiliated with or endorsed by
-Ascensio System SIA. The app is free software under the GNU AGPL version 3 or later.
+Based on ONLYOFFICE Docs by Ascensio System SIA; this version may have been modified.
+ONLYOFFICE® and ONLYOFFICE Docs™ are registered trademarks or trademarks of Ascensio System SIA;
+this app is not affiliated with or endorsed by Ascensio System SIA. The app is free software under
+the GNU AGPL version 3 or later; in the editor, **About this editor** (the ⓘ in its corner) shows
+this notice and the link to the source of the version you run.
 
 Source and issues:
 [github.com/BRF-Tech/filex-office-editor](https://github.com/BRF-Tech/filex-office-editor).
