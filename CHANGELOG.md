@@ -24,7 +24,11 @@ No migration. Deploy as usual; rolling back to 0.1.1 needs nothing but the image
 ### Changed
 
 - **Validators: filex 0.60.0 (`latest`, `plugin-latest`) and 0.59.1 (`floor`)** in the example
-  compose, the end-to-end stack and `validators-it.sh`, as on the reference store.
+  compose, the end-to-end stack and `validators-it.sh`, as on the reference store. Since filex 0.59.1
+  a dry run reads the manifest alone (`"from_manifest": true`) and downloads nothing: the module's
+  and the interface's hashes it reports are the manifest's pins. The bytes are checked by the
+  resolver's `artifacts` step and by filex's install, which refuses a file that does not hash to its
+  pin; a release asset swapped after the store resolved it no longer fails the dry run.
 - **filex's own file types from filex 0.60.0** (`filex-builtin.json`): the same 160 kinds, five
   sources on new lines.
 
