@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/brf-tech/filex-apps/backend/internal/appsetup"
 	"github.com/brf-tech/filex-apps/backend/internal/domain"
 	"github.com/brf-tech/filex-apps/backend/internal/filexrange"
 )
@@ -83,6 +84,12 @@ func parseManifest(b []byte) (*parsed, error) {
 		return nil, fmt.Errorf("the filex range does not parse: %v", err)
 	}
 	p.rng = rng
+	// The blocks the store shows of setting an app up (filex 0.60.0:
+	// routes, setup, link_shortener; user_permissions), held to filex's own
+	// rules for them (internal/appsetup).
+	if _, err := appsetup.Read(b); err != nil {
+		return nil, err
+	}
 	p.kind = domain.KindApp
 	if p.m.isLanguagePack() {
 		p.kind = domain.KindLanguagePack

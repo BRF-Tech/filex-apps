@@ -484,6 +484,39 @@ func TestResolve_TheManifestAtTheCommit(t *testing.T) {
 	}
 }
 
+// The blocks of setting an app up (filex 0.60.0) are held to filex's rules
+// at the manifest check, before any validator is asked: a short-link app
+// resolves with its permissions as declared, a route without its permission
+// fails with filex's sentence.
+func TestResolve_TheSetupBlocks(t *testing.T) {
+	ctx := context.Background()
+	blocks := func(perms []string) func(map[string]any) {
+		return func(m map[string]any) {
+			m["filex"] = ">=0.60.0"
+			m["permissions"] = perms
+			m["views"] = []map[string]any{{"id": "setup", "placement": "setup", "label": map[string]string{"en": "Set up"}}}
+			m["routes"] = []map[string]any{{"id": "go", "label": map[string]string{"en": "Short links"}, "default_prefix": "l"}}
+			m["setup"] = map[string]any{"view": "setup"}
+			m["link_shortener"] = map[string]string{"route": "go"}
+		}
+	}
+	f := newFake(t)
+	f.signFixture(t, blocks([]string{"data", "public_routes", "link_shortener"}), "")
+	res, checks, err := f.resolver(t, nil, Limits{}).Resolve(ctx, req(""))
+	if err != nil || res.Kind != domain.KindApp || strings.Join(res.Permissions, ",") != "data,public_routes,link_shortener" {
+		t.Fatalf("%v %s %v", err, statuses(checks), res.Permissions)
+	}
+
+	f = newFake(t)
+	f.signFixture(t, blocks([]string{"data", "link_shortener"}), "")
+	_, checks, err = f.resolver(t, nil, Limits{}).Resolve(ctx, req(""))
+	c := last(checks)
+	if err != nil || c.Kind != domain.CheckManifest || c.Code != CodeManifestBad ||
+		!strings.Contains(c.Message, "filex-app.json: routes: the manifest declares routes but never asks for the public_routes permission") {
+		t.Errorf("%v %s %q", err, statuses(checks), c.Message)
+	}
+}
+
 func TestResolve_TheConsentFile(t *testing.T) {
 	ctx := context.Background()
 	for name, c := range map[string]struct {

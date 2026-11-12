@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 
+	"github.com/brf-tech/filex-apps/backend/internal/appsetup"
 	"github.com/brf-tech/filex-apps/backend/internal/domain"
 	"github.com/brf-tech/filex-apps/backend/internal/filetypes"
 	"github.com/brf-tech/filex-apps/backend/internal/index"
@@ -139,6 +140,11 @@ type versionDetailView struct {
 	// Conversions: what the version converts, kind by kind (its listing's
 	// declaration, migration 0008); empty when it declares none.
 	Conversions []filetypes.ConversionRow `json:"conversions"`
+	// Setup: what setting the version up asks (its manifest's routes,
+	// setup, link_shortener and user_permissions, read by internal/appsetup
+	// from the manifest the version was approved with); absent when it
+	// declares none, and for a language pack or a storage plugin.
+	Setup *appsetup.Setup `json:"setup,omitempty"`
 	// Builds: a storage plugin's builds, one per platform in the store's
 	// order (domain.StoragePlatforms), each pinned and signed; absent for an
 	// app. Manifest is then the release's filex-storage.json.
@@ -181,6 +187,11 @@ func versionDetail(app store.App, v store.Version, types filetypes.Set) versionD
 	}
 	if v.Wasm != nil {
 		out.Wasm = &artifactView{URL: v.Wasm.URL, SHA256: v.Wasm.SHA256, Size: v.Wasm.Size, Sig: v.Wasm.Sig}
+	}
+	if app.Kind == string(domain.KindApp) && len(v.Manifest) > 0 {
+		if s, err := appsetup.Read(v.Manifest); err == nil && !s.Empty() {
+			out.Setup = &s
+		}
 	}
 	if v.UI != nil {
 		out.UI = &artifactView{URL: v.UI.URL, SHA256: v.UI.SHA256, Size: v.UI.Size, Sig: v.UI.Sig}

@@ -1791,6 +1791,47 @@ export interface components {
              */
             builds?: components["schemas"]["BuildRow"][];
             conformance?: components["schemas"]["Conformance"];
+            setup?: components["schemas"]["AppSetup"];
+        };
+        /**
+         * @description What setting the version up asks, read from the manifest it was approved with (filex 0.60.0
+         *     `routes`, `setup` and `link_shortener`; `user_permissions`, filex 0.49.0), held to filex's own rules
+         *     for those blocks at submission. Absent when the manifest declares none of them, and for a language
+         *     pack or a storage plugin.
+         */
+        AppSetup: {
+            /** @description An administrator sets the app up once, after installing it and before it runs (the manifest has `setup`, or routes, which have no address until given one). */
+            needs_setup: boolean;
+            /** @description The setup starts with the app's own step (`setup.view`). */
+            wizard: boolean;
+            /** @description The app's own public addresses, in the manifest's order; the setup asks for each one's address. */
+            routes: components["schemas"]["AppRoute"][];
+            /** @description The app takes the link-shortener role, on one of its routes. */
+            link_shortener?: {
+                /** @description The id of the route the short addresses are on. */
+                route: string;
+                /** @description The user permission a person needs for "Get short link"; absent: whoever may make the link. */
+                requires?: string;
+            };
+            reset_warning?: components["schemas"]["Text"];
+            /** @description What an administrator grants per role and per person inside the app. */
+            user_permissions: components["schemas"]["AppUserPermission"][];
+        };
+        AppRoute: {
+            id: string;
+            label: components["schemas"]["Text"];
+            /** @description The path the setup suggests on the filex's own address (`l`: `files.example.com/l/<code>`). */
+            default_prefix?: string;
+        };
+        AppUserPermission: {
+            id: string;
+            label: components["schemas"]["Text"];
+            description?: components["schemas"]["Text"];
+            /**
+             * @description Who holds it until the administrator decides: every account, the accounts that can change files, or administrators only.
+             * @enum {string}
+             */
+            default: "viewer" | "user" | "admin";
         };
         BuildRow: components["schemas"]["IndexArtifact"] & {
             /** @description `os/arch`, as Go names them (`linux/amd64`). */

@@ -1,0 +1,133 @@
+{
+  "manifest_version": 1,
+  "name": "shortlink",
+  "version": "0.1.0",
+  "filex": ">=0.60.0",
+  "label": {
+    "en": "Short links",
+    "tr": "Kısa bağlantılar"
+  },
+  "description": {
+    "en": "Short addresses for filex links and, if you allow it, for any web address: a share, a file request or an upload's link becomes l.example.com/aB3x9kQ2z, with the address, the alphabet and the length you choose at setup, and a click count. The links live in the app's own data; the codes are drawn at random and guessing them is held back.",
+    "tr": "filex bağlantıları ve izin verirseniz herhangi bir web adresi için kısa adresler: bir paylaşımın, dosya isteğinin ya da yüklemenin bağlantısı, kurulumda seçtiğiniz adres, alfabe ve uzunlukla l.example.com/aB3x9kQ2z olur ve tıklanma sayısı tutulur. Bağlantılar uygulamanın kendi verisinde durur; kodlar rastgele çekilir ve tahmin edilmeleri engellenir."
+  },
+  "homepage": "https://github.com/BRF-Tech/filex-shortlink",
+  "languages": [
+    "en",
+    "tr"
+  ],
+  "permissions": [
+    "data",
+    "public_routes",
+    "link_shortener"
+  ],
+  "permission_reasons": {
+    "data": {
+      "en": "To keep its setup and its links (each code, where it goes, who made it, its click count) in its own data. Nothing goes into filex's own database, and the data is erased when you remove the app or set it up again.",
+      "tr": "Kurulumunu ve bağlantılarını (her kodu, nereye gittiğini, kimin açtığını, tıklanma sayısını) kendi verisinde tutmak için. filex'in kendi veritabanına hiçbir şey yazılmaz; uygulamayı kaldırdığınızda ya da yeniden kurduğunuzda veri silinir."
+    },
+    "public_routes": {
+      "en": "To answer the short addresses at the address you give it in its setup: a visitor is sent on to the link the code stands for, or shown the same \"not available\" page for any code that leads nowhere. It reads no file.",
+      "tr": "Kurulumda verdiğiniz adreste kısa adreslere cevap vermek için: ziyaretçi kodun karşılığı olan bağlantıya yönlendirilir; hiçbir yere gitmeyen her kod için aynı \"kullanılamıyor\" sayfası gösterilir. Hiçbir dosyayı okumaz."
+    },
+    "link_shortener": {
+      "en": "To make the short address when somebody presses \"Get short link\" on a share, a file request or an upload, and to stop answering a short address once the link it stands for has ended.",
+      "tr": "Biri bir paylaşımda, dosya isteğinde ya da yüklemede \"Kısa bağlantı al\" dediğinde kısa adresi üretmek ve karşılığı olan bağlantı sona erdiğinde o kısa adrese cevap vermeyi bırakmak için."
+    }
+  },
+  "user_permissions": [
+    {
+      "id": "use",
+      "label": {
+        "en": "Get short links",
+        "tr": "Kısa bağlantı almak"
+      },
+      "description": {
+        "en": "\"Get short link\" on the shares, file requests and uploads the person may make links for.",
+        "tr": "Kişinin bağlantı açabildiği paylaşımlarda, dosya isteklerinde ve yüklemelerde \"Kısa bağlantı al\"."
+      },
+      "default": "user"
+    },
+    {
+      "id": "outside",
+      "label": {
+        "en": "Shorten any address",
+        "tr": "Herhangi bir adresi kısaltmak"
+      },
+      "description": {
+        "en": "Shorten a web address outside filex on the Short links page, when the setup allows it. A short address on your domain can be sent anywhere, so give this to people you trust with it.",
+        "tr": "Kurulum izin veriyorsa Kısa bağlantılar sayfasında filex dışındaki bir web adresini kısaltmak. Alan adınızdaki kısa adres her yere gönderilebilir; bu izni güvendiğiniz kişilere verin."
+      },
+      "default": "admin"
+    },
+    {
+      "id": "aliases",
+      "label": {
+        "en": "Choose a code by hand",
+        "tr": "Kodu elle seçmek"
+      },
+      "description": {
+        "en": "Give an address shortened on the Short links page a code of one's own (l.example.com/offer), when the setup allows aliases. Such a code is a word, and words can be guessed.",
+        "tr": "Kurulum takma ada izin veriyorsa Kısa bağlantılar sayfasında kısaltılan bir adrese kendi seçtiği kodu vermek (l.example.com/teklif). Böyle bir kod bir kelimedir ve kelimeler tahmin edilebilir."
+      },
+      "default": "admin"
+    },
+    {
+      "id": "manage",
+      "label": {
+        "en": "Manage every short link",
+        "tr": "Tüm kısa bağlantıları yönetmek"
+      },
+      "description": {
+        "en": "See every short link of the tenant on the Short links page, and switch off or delete anybody's.",
+        "tr": "Kısa bağlantılar sayfasında kiracının tüm kısa bağlantılarını görmek ve herkesinkini kapatmak ya da silmek."
+      },
+      "default": "admin"
+    }
+  ],
+  "views": [
+    {
+      "id": "setup",
+      "placement": "setup",
+      "label": {
+        "en": "Set up short links",
+        "tr": "Kısa bağlantıları kur"
+      }
+    },
+    {
+      "id": "links",
+      "placement": "home",
+      "label": {
+        "en": "Short links",
+        "tr": "Kısa bağlantılar"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "id": "go",
+      "label": {
+        "en": "Short links",
+        "tr": "Kısa bağlantılar"
+      },
+      "default_prefix": "l"
+    }
+  ],
+  "setup": {
+    "view": "setup",
+    "reset": {
+      "warning": {
+        "en": "Every short link this app made stops working, for good: the codes, where they went and their click counts are erased. A short link that was printed, mailed or pasted anywhere will answer \"not available\".",
+        "tr": "Bu uygulamanın ürettiği her kısa bağlantı kalıcı olarak çalışmaz olur: kodlar, gittikleri yerler ve tıklanma sayıları silinir. Basılmış, maille gönderilmiş ya da bir yere yapıştırılmış kısa bağlantılar \"kullanılamıyor\" cevabı verir."
+      }
+    }
+  },
+  "link_shortener": {
+    "route": "go",
+    "requires": "use"
+  },
+  "wasm": {
+    "url": "https://github.com/BRF-Tech/filex-shortlink/releases/download/{tag}/plugin.wasm",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

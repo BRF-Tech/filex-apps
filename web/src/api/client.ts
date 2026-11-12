@@ -24,6 +24,7 @@ export type VersionDetail = Schemas['VersionDetail'];
 export type PermissionRow = Schemas['PermissionRow'];
 export type IndexArtifact = Schemas['IndexArtifact'];
 export type BuildRow = Schemas['BuildRow'];
+export type AppSetup = Schemas['AppSetup'];
 export type Conformance = Schemas['Conformance'];
 export type IndexMedia = Schemas['IndexMedia'];
 export type IndexRelease = Schemas['IndexRelease'];

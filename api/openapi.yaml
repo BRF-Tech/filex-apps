@@ -2426,6 +2426,54 @@ components:
                 `filex-storage.json`.
               items: { $ref: '#/components/schemas/BuildRow' }
             conformance: { $ref: '#/components/schemas/Conformance' }
+            setup: { $ref: '#/components/schemas/AppSetup' }
+    AppSetup:
+      type: object
+      description: |
+        What setting the version up asks, read from the manifest it was approved with (filex 0.60.0
+        `routes`, `setup` and `link_shortener`; `user_permissions`, filex 0.49.0), held to filex's own rules
+        for those blocks at submission. Absent when the manifest declares none of them, and for a language
+        pack or a storage plugin.
+      required: [needs_setup, wizard, routes, user_permissions]
+      properties:
+        needs_setup:
+          type: boolean
+          description: An administrator sets the app up once, after installing it and before it runs (the manifest has `setup`, or routes, which have no address until given one).
+        wizard: { type: boolean, description: 'The setup starts with the app''s own step (`setup.view`).' }
+        routes:
+          type: array
+          description: The app's own public addresses, in the manifest's order; the setup asks for each one's address.
+          items: { $ref: '#/components/schemas/AppRoute' }
+        link_shortener:
+          type: object
+          description: The app takes the link-shortener role, on one of its routes.
+          required: [route]
+          properties:
+            route: { type: string, description: 'The id of the route the short addresses are on.' }
+            requires: { type: string, description: 'The user permission a person needs for "Get short link"; absent: whoever may make the link.' }
+        reset_warning: { $ref: '#/components/schemas/Text' }
+        user_permissions:
+          type: array
+          description: What an administrator grants per role and per person inside the app.
+          items: { $ref: '#/components/schemas/AppUserPermission' }
+    AppRoute:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { $ref: '#/components/schemas/Text' }
+        default_prefix: { type: string, description: 'The path the setup suggests on the filex''s own address (`l`: `files.example.com/l/<code>`).' }
+    AppUserPermission:
+      type: object
+      required: [id, label, default]
+      properties:
+        id: { type: string }
+        label: { $ref: '#/components/schemas/Text' }
+        description: { $ref: '#/components/schemas/Text' }
+        default:
+          type: string
+          enum: [viewer, user, admin]
+          description: 'Who holds it until the administrator decides: every account, the accounts that can change files, or administrators only.'
     BuildRow:
       allOf:
         - { $ref: '#/components/schemas/IndexArtifact' }
