@@ -25,6 +25,12 @@
 //   - The version comes from anonymous GET /api/capabilities (`version`,
 //     e.g. "v0.50.0 (9873e3e4…, 2026-10-03T00:50:59Z)").
 //   - A dry run downloads but does not compile: 20 MB module 0.8-5.2 s.
+//     Since filex 0.59.1 it downloads nothing (measured 2026-11-12 on 0.60.0
+//     and 0.59.1): a review from a source reads the manifest alone and says
+//     `"from_manifest": true`, its wasm_sha256 and ui.sha256 are the
+//     manifest's pins, and filex refuses other bytes at the install itself.
+//     The bytes are the resolver's artifacts check; the comparison below
+//     still holds the manifest filex read to the one the resolver pinned.
 package validator
 
 import (

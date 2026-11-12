@@ -357,8 +357,8 @@ publisher and the reviewer see, with a machine code and a sentence.
 - **The range picks the validators here, before any call** (`internal/filexrange`, filex's own range
   grammar and version order), not filex's answer: a filex outside a range does not always say so
   (filex-convert 0.2.0, `>=0.50.0`, answers `400 manifest_invalid` on 0.49). The two validators are
-  the newest filex (`latest`, today 0.53.0) and the oldest filex the store supports (`floor`, policy:
-  the previous minor, today 0.52.0).
+  the newest filex (`latest`, today 0.60.0) and the oldest filex the store supports (`floor`, policy:
+  the previous minor, today 0.59.1).
   A validator outside the range gets a `skipped` row with code
   `out_of_range`; a range that admits neither fails `no_validator_in_range`; a range that does not
   parse fails `range_invalid`. The version of each validator is read from `GET /api/capabilities`.
@@ -368,7 +368,11 @@ publisher and the reviewer see, with a machine code and a sentence.
 - **Passed** means: HTTP 200, `compat.ok` true (or no range), `kind` as resolved, and every hash filex
   reports equal to the resolver's: `manifest_sha256` (filex reports it only for an app without a
   module), `wasm_sha256` (apps with a module) and `ui_sha256` (interface bundles; the request carries
-  `ExpectUISHA256`). The **permission comparison** takes filex's permission rows, **drops the ones filex
+  `ExpectUISHA256`). Since filex 0.59.1 a dry run reads the manifest alone and downloads nothing
+  (`"from_manifest": true`): the module's and the interface's hashes it reports are the manifest's pins.
+  The bytes are then the resolver's `artifacts` check (step 6) and filex's own at the install, which
+  refuses any file that does not hash to its pin; a release asset swapped after the store resolved it
+  is no longer caught by the dry run. The **permission comparison** takes filex's permission rows, **drops the ones filex
   derives itself** (`ui`, `ui:*`, `ui-net:*`, `ui-viewer:*`, `ui-new:*`, `thumbnail:*`, and from
   filex 0.56 `files:e2e-plaintext` and `files:co-edit`, from the `encrypted_folders` and `co_edit`
   blocks, and from filex 0.57 `office-engine`, from the `engines.office` block:

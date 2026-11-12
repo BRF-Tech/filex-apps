@@ -509,6 +509,24 @@ func itVersions(t *testing.T) map[string]filexrange.Version {
 
 // After the store read the tag, the bytes filex is served change: the
 // review fails, never passes on the new bytes.
+// fromManifest reports whether a validator's answer says it read the
+// manifest alone (filex 0.59.1 and later: `"from_manifest": true`, the
+// module's and the interface's sha256 are the manifest's pins and nothing
+// was downloaded; filex refuses other bytes at the install itself).
+func fromManifest(t *testing.T, r domain.DryRunResult) bool {
+	t.Helper()
+	var a struct {
+		FromManifest bool `json:"from_manifest"`
+	}
+	if len(r.Raw) == 0 {
+		return false
+	}
+	if err := json.Unmarshal(r.Raw, &a); err != nil {
+		t.Fatalf("%s's answer: %v", r.Validator, err)
+	}
+	return a.FromManifest
+}
+
 func TestIntegration_BytesThatMovedAfterResolvingFail(t *testing.T) {
 	w := newWorld(t)
 	r := w.runner(t)
@@ -516,17 +534,33 @@ func TestIntegration_BytesThatMovedAfterResolvingFail(t *testing.T) {
 	res := w.resolve(t, "BRF-Tech/filex-sign")
 	at := "BRF-Tech/filex-sign/" + rec.Tag + "/"
 
+	// A module swapped after the store resolved it. A filex that downloads
+	// it for the review (before 0.59.1) refuses it: the manifest pins it. A
+	// filex that reads the manifest alone answers the pin and passes; the
+	// swapped bytes then meet filex's own check at the install, and the
+	// store's (the resolver's artifacts check) at the next submission.
 	swapped := append([]byte{}, rec.module...)
 	swapped[len(swapped)-1] ^= 0xff
 	w.mu.Lock()
 	w.filexSees[at+"module"] = swapped
 	w.mu.Unlock()
-	_, checks, err := r.DryRun(context.Background(), dryRunRequest(res))
+	results, checks, err := r.DryRun(context.Background(), dryRunRequest(res))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := checkSummary(checks); got != "dry_run[latest]=failed(sha256_mismatch) dry_run[floor]=failed(sha256_mismatch)" {
-		t.Errorf("a swapped module (filex's own refusal: the manifest pins it): %s", got)
+	var want []string
+	for _, rr := range results {
+		if fromManifest(t, rr) {
+			want = append(want, "dry_run["+rr.Validator+"]=passed")
+			if rr.WasmSHA256 != res.Wasm.SHA256 {
+				t.Errorf("%s read the manifest alone but answered the module as %s, not its pin %s", rr.Validator, rr.WasmSHA256, res.Wasm.SHA256)
+			}
+		} else {
+			want = append(want, "dry_run["+rr.Validator+"]=failed(sha256_mismatch)")
+		}
+	}
+	if got := checkSummary(checks); got != strings.Join(want, " ") {
+		t.Errorf("a swapped module: %s, want %s", got, strings.Join(want, " "))
 	}
 
 	var m map[string]any
