@@ -35,6 +35,7 @@ import PageState from '@/components/PageState.vue';
 import PermissionList from '@/components/PermissionList.vue';
 import PublisherBadges from '@/components/PublisherBadges.vue';
 import ScreenshotGallery from '@/components/ScreenshotGallery.vue';
+import SetupSection from '@/components/SetupSection.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 
 const route = useRoute();
@@ -394,6 +395,7 @@ const asArt = (r: unknown) => r as ArtifactRow;
               <template v-else>
                 <ol class="fa-steps">
                   <li v-for="(step, i) in S.app.installSteps" :key="i">{{ step }}</li>
+                  <li v-if="version.setup?.needs_setup" data-testid="install-step-setup">{{ S.app.installStepSetup }}</li>
                 </ol>
                 <div class="fa-copyrow">
                   <span class="fa-copyrow__label">{{ S.app.installRepo }}</span>
@@ -575,6 +577,11 @@ const asArt = (r: unknown) => r as ArtifactRow;
                 </details>
               </template>
             </section>
+
+            <!-- What setting it up asks (filex 0.60.0: its own addresses, the
+                 short-link role, its setup step), read by the server from
+                 the version's manifest; absent when it declares none. -->
+            <SetupSection v-if="version?.setup && app.kind === 'app'" :setup="version.setup" />
 
             <section v-if="version && isStorage" class="fa-section" aria-labelledby="storage-h" data-testid="storage-section">
               <h2 id="storage-h">{{ S.app.storageTitle }}</h2>

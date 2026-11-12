@@ -45,6 +45,9 @@ describe('helpers behind the look', () => {
     expect(permissionKind('thumbnail:.jpg')).toBe('thumbnail');
     expect(permissionKind('convert.office')).toBe('convert');
     expect(permissionKind('office-engine')).toBe('convert');
+    expect(permissionKind('public_routes')).toBe('net');
+    expect(permissionKind('link_shortener')).toBe('net');
+    expect(permissionKind('data')).toBe('data');
     expect(permissionKind('something-new')).toBe('other');
   });
 

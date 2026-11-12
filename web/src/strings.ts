@@ -274,6 +274,7 @@ export const S = {
       'Choose "GitHub repository" and enter the repository and the tag below.',
       'filex downloads the app, checks every SHA-256 against its manifest and shows you the permissions below. Read them, then press Install.',
     ],
+    installStepSetup: 'Then filex opens the app\'s setup, which an administrator finishes before the app runs ("Setting it up", below).',
     installRepo: 'GitHub repository',
     installRef: 'Tag',
     installStepsStorage: [
@@ -348,6 +349,30 @@ export const S = {
     revokeIntro: 'Revoking tells every filex that has this app installed to remove it. The app stays in the index, marked revoked.',
     yankTitle: 'Yank {app} {version}',
     yankIntro: 'A yanked version stays in the index, marked: no new installs, installed copies are warned.',
+  },
+  // What setting an app up asks (its manifest's routes, setup,
+  // link_shortener and user_permissions; filex 0.60.0).
+  setup: {
+    title: 'Setting it up',
+    intro: 'After installing it, an administrator sets this app up once. Until then it runs nothing.',
+    wizard: 'Its own setup step',
+    wizardText: 'The setup opens with a step of the app\'s own, then filex asks for what the app declares below.',
+    route: 'Its own addresses: {label}',
+    routeText: 'An app with addresses of its own, which visitors open without an account: the setup asks where they live.',
+    routeSuggested: 'Suggested at setup: your filex\'s address followed by /{prefix}.',
+    shortener: 'Makes filex\'s short links',
+    shortenerText: '"Get short link" beside a share, a file request and an upload\'s link gives a short address on "{route}". One app makes filex\'s short links at a time.',
+    shortenerRequires: 'People need "{permission}" for it.',
+    reset: 'Setting it up again erases its data',
+    resetText: 'So does removing it. In the app\'s words: {warning}',
+    peopleTitle: 'What people may do in it',
+    peopleIntro: 'An administrator grants each of these per role and per person, at setup and any time after.',
+    peopleDefault: 'Until granted: {who}',
+    defaultWho: {
+      viewer: 'every account',
+      user: 'the accounts that can change files',
+      admin: 'administrators only',
+    } as Record<string, string>,
   },
   publishers: {
     title: 'Publishers',

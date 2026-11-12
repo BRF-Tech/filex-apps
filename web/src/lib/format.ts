@@ -178,13 +178,16 @@ export function initialOf(name: string): string {
 /** What a permission touches, read from its id (filex writes `files:read`,
  *  `ui-viewer:.drawio`, `net:...`; older manifests `files.read`). Only picks a
  *  picture: the words shown are always filex's own label. */
-export type PermissionKind = 'files' | 'ui' | 'net' | 'convert' | 'thumbnail' | 'other';
+export type PermissionKind = 'files' | 'ui' | 'net' | 'convert' | 'thumbnail' | 'data' | 'other';
 
 export function permissionKind(id: string): PermissionKind {
   const head = id.toLowerCase().split(/[:.]/)[0];
   if (head === 'files' || head === 'file' || head === 'storage') return 'files';
   if (head === 'thumbnail' || head === 'thumbnails') return 'thumbnail';
-  if (head === 'net' || head === 'ui-net' || head === 'network' || head === 'http') return 'net';
+  // filex 0.60.0: addresses visitors open (public_routes), the short links
+  // it makes beside filex's own (link_shortener), the app's own data.
+  if (head === 'net' || head === 'ui-net' || head === 'network' || head === 'http' || head === 'public_routes' || head === 'link_shortener') return 'net';
+  if (head === 'data') return 'data';
   if (head === 'convert' || head === 'engine' || head === 'office' || head === 'office-engine') return 'convert';
   if (head === 'ui' || head.startsWith('ui-')) return 'ui';
   return 'other';

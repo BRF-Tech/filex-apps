@@ -62,6 +62,10 @@ const PERMS: Record<string, string> = {
   'net.github': 'Reach github.com from its interface',
   'convert.office': 'Ask filex to convert documents with its office engine',
   'thumbnail.jpeg': 'Draw thumbnails for JPEG photos in the explorer',
+  // filex 0.60.0's words (backend/internal/srvtext/locales/en.json).
+  data: "Keeps data of its own on this filex (outside filex's own database, within the size the operator allows); it is erased when the app is removed or set up again",
+  public_routes: 'Answers visitors without an account at the addresses you give it in its setup (for example short links), through filex, with no access to files',
+  link_shortener: 'Is offered to shorten filex links: it is handed each share, file request or upload link a person asks to shorten, and may ask whether such a link is still open',
 };
 
 function perms(ids: string[], reasons: Record<string, string> = {}): Sch['PermissionRow'][] {
@@ -148,6 +152,8 @@ function makeApp(
     fileTypes?: Sch['FileTypeUse'][];
     /** What the versions convert (the server reads it from the listing's declaration). */
     conversions?: Sch['ConversionRow'][];
+    /** What setting it up asks (the server reads it from the manifest). */
+    setup?: Sch['AppSetup'];
   },
 ): AppRecord {
   const pub = state.publishers.find((p) => p.id === a.publisher)!;
@@ -185,6 +191,7 @@ function makeApp(
       install: { github_repo: a.repo, ref: tag },
       file_types: a.fileTypes ?? [],
       conversions: a.conversions ?? [],
+      ...(a.setup ? { setup: a.setup } : {}),
       ...(v.builds
         ? {
             builds: v.builds.map((plat) => ({ platform: plat, ...artifact(a.name + v.version + plat, base + `${a.name}-${plat.replace('/', '-')}${plat.startsWith('windows/') ? '.exe' : ''}`, 9_400_000) })),
@@ -474,6 +481,37 @@ export function buildState(): State {
       glyph: 'notes',
       status: 'unlisted',
       versions: [{ version: '0.3.0', daysAgo: 40, filex: '>=0.49.0', perms: ['files.read'], ui: true }],
+    }),
+    // An app that is set up after it is installed (filex 0.60.0): its own
+    // setup step, an address of its own, the short-link role, user
+    // permissions (BRF-Tech/filex-shortlink's manifest).
+    makeApp(state, {
+      name: 'shortlink',
+      label: 'Short links',
+      summary: 'Short addresses for filex links, on the address you choose at setup, with a click count.',
+      kind: 'app',
+      publisher: 'brf-tech',
+      repo: 'BRF-Tech/filex-shortlink',
+      categories: ['productivity'],
+      license: 'MIT',
+      color: [124, 58, 237],
+      glyph: 'share',
+      reasons: { public_routes: 'To answer the short addresses at the address you give it in its setup.' },
+      versions: [{ version: '0.1.0', daysAgo: 1, filex: '>=0.60.0', perms: ['data', 'public_routes', 'link_shortener'], wasm: true }],
+      setup: {
+        needs_setup: true,
+        wizard: true,
+        routes: [{ id: 'go', label: { en: 'Short links', tr: 'Kısa bağlantılar' }, default_prefix: 'l' }],
+        link_shortener: { route: 'go', requires: 'use' },
+        reset_warning: {
+          en: 'Every short link this app made stops working, for good: the codes, where they went and their click counts are erased. A short link that was printed, mailed or pasted anywhere will answer "not available".',
+        },
+        user_permissions: [
+          { id: 'use', label: { en: 'Get short links' }, description: { en: '"Get short link" on the shares, file requests and uploads the person may make links for.' }, default: 'user' },
+          { id: 'outside', label: { en: 'Shorten any address' }, description: { en: 'Shorten a web address outside filex on the Short links page, when the setup allows it.' }, default: 'admin' },
+          { id: 'manage', label: { en: 'Manage every short link' }, description: { en: 'See every short link of the tenant on the Short links page, and switch off or delete anybody\'s.' }, default: 'admin' },
+        ],
+      },
     }),
     // A storage plugin: its release's feed and a build per platform,
     // the linux/amd64 one run by the store's plugin validator.

@@ -4,7 +4,7 @@
 // reason under it. The permission's id stays visible, small, for the reader
 // who compares it with the manifest.
 import type { Component } from 'vue';
-import { AppWindow, FileText, Globe, Image, KeyRound, Repeat } from 'lucide-vue-next';
+import { AppWindow, Database, FileText, Globe, Image, KeyRound, Repeat } from 'lucide-vue-next';
 import type { PermissionRow } from '@/api/client';
 import { S, fmt } from '@/strings';
 import { permissionKind, text, type PermissionKind } from '@/lib/format';
@@ -17,6 +17,7 @@ const LOOK: Record<PermissionKind, { icon: Component; tone: number }> = {
   net: { icon: Globe, tone: 5 },
   convert: { icon: Repeat, tone: 2 },
   thumbnail: { icon: Image, tone: 4 },
+  data: { icon: Database, tone: 6 },
   other: { icon: KeyRound, tone: 6 },
 };
 const look = (id: string) => LOOK[permissionKind(id)];
