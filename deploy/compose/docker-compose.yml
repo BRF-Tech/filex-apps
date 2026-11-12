@@ -114,18 +114,18 @@ services:
 
   filex-latest:
     <<: *validator
-    image: ghcr.io/brf-tech/filex:v0.59.0
+    image: ghcr.io/brf-tech/filex:v0.60.0
 
   filex-floor:
     <<: *validator
-    image: ghcr.io/brf-tech/filex:v0.58.0
+    image: ghcr.io/brf-tech/filex:v0.59.1
 
   # filex's storage plugin validator. What each flag and capability is for:
   # docs/DEPLOY.md "The plugin validator". filex's image asks
   # 127.0.0.1:5212/healthz for its health, which this mode does not serve (no
   # HTTP, no network); health is its heartbeat file instead.
   plugin-latest:
-    image: ghcr.io/brf-tech/filex:v0.59.0
+    image: ghcr.io/brf-tech/filex:v0.60.0
     command: ["plugin-validator", "--spool", "/spool", "--work-dir", "/work", "--store-uid", "65532",
               "--plugin-uid", "65534", "--plugin-gid", "65534"]
     restart: unless-stopped

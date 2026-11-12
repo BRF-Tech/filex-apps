@@ -81,9 +81,9 @@ on a plugin validator ([Storage plugins](#storage-plugins)).
  (index)                  | - pipeline workers (Postgres job queue)   --- Redis (its own; rate limits only)
                           | - index publisher + signer (keys in env)
                           | - media mirror
-                          +--- HTTP (compose default network) ---> filex-latest  (ghcr.io/brf-tech/filex:v0.59.0)
-                          |                                   ---> filex-floor   (ghcr.io/brf-tech/filex:v0.58.0)
-                          +--- shared folder (no network) -------> plugin-latest (ghcr.io/brf-tech/filex:v0.59.0)
+                          +--- HTTP (compose default network) ---> filex-latest  (ghcr.io/brf-tech/filex:v0.60.0)
+                          |                                   ---> filex-floor   (ghcr.io/brf-tech/filex:v0.59.1)
+                          +--- shared folder (no network) -------> plugin-latest (ghcr.io/brf-tech/filex:v0.60.0)
 ```
 
 | Component | What it does | Where |
@@ -1487,7 +1487,7 @@ recommendation.
 | **Q4** | Production domain | **Decided and live (2026-10-05):** `apps.filex.sh`, the reference store, after the demo (demo retired 2026-10-05) |
 | **Q5** | Organization publishers: how is ownership proven? | **Decided:** phase 1, an administrator activates org publishers by hand; every submission still needs repository `admin`/`maintain` and the consent file. `read:org` only if self-service org publishers are wanted |
 | **Q6** | Language packs have no tags; the store accepts tags only | **Decided:** tag them (signed tags by the owner) before listing. **Done**: `v0.1.8` of filex-lang-es, -de and -fr are signed tags (GitHub: verified), listed on the demo since 2026-10-04 and in production since 2026-10-05 |
-| **Q7** | Which filex versions do the validators cover? | **Decided:** `latest` = newest release, `floor` = previous minor (today 0.59.0 and 0.58.0; the plugin validator `plugin-latest` on latest's image); bump both at each filex release; apps whose range admits neither fail `no_validator_in_range` |
+| **Q7** | Which filex versions do the validators cover? | **Decided:** `latest` = newest release, `floor` = previous minor (today 0.60.0 and 0.59.1, the floor on the minor's newest patch; the plugin validator `plugin-latest` on latest's image); bump both at each filex release; apps whose range admits neither fail `no_validator_in_range` |
 | **Q8** | Artifact mirror (`/v1/a/<sha256>`) for air-gapped filex | **Decided:** phase 3, with object storage (Garage) rather than Postgres |
 | **Q9** | Four-eyes review while the owner is the only reviewer and also the official publisher | **Decided:** an admin may approve their own publisher's submissions in phase 1, flagged in the audit log; enforce four-eyes once there is a second reviewer |
 | **Q10** | Listing metadata source | **Decided:** the repository's `.filex-apps.json` (pinned to the commit, reviewed); the web form shows a live preview of it |
