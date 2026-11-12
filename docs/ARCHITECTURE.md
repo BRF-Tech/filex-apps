@@ -18,6 +18,7 @@ OpenAPI file disagree, the OpenAPI file is right and this document is fixed.
 5. [Identity and access](#identity-and-access)
 6. [Submission pipeline](#submission-pipeline)
     - [Storage plugins](#storage-plugins)
+    - [Setting an app up](#setting-an-app-up)
 7. [Review and policy](#review-and-policy)
 8. [Operator import (official publisher)](#operator-import-official-publisher)
 9. [The signed index](#the-signed-index)
@@ -114,6 +115,7 @@ on a plugin validator ([Storage plugins](#storage-plugins)).
 | `internal/consent` | parses and validates `.filex-apps.json` | validator |
 | `internal/resolve` | implements `pipeline.Resolver` | validator |
 | `internal/validator` | implements `pipeline.DryRunner` against the filex validators | validator |
+| `internal/appsetup` | what a manifest says about setting the app up (filex 0.60.0 `routes`, `setup`, `link_shortener`; `user_permissions`), held to filex's own `plugintest.InspectManifest` for those blocks ([Setting an app up](#setting-an-app-up)) | validator |
 | `internal/plugincheck` | implements `pipeline.DryRunner` for storage plugins: hands each build to a plugin validator through its spool folder and judges the answer ([Storage plugins](#storage-plugins)) | validator |
 | `internal/filexrange` | filex's version-range syntax (comparators joined by spaces, alternatives by `\|\|`), semver order | validator |
 | `internal/signing` | the signature scheme (**done**, with independent test vectors) | architect, then validator |
@@ -339,7 +341,7 @@ publisher and the reviewer see, with a machine code and a sentence.
 |---|---|---|---|
 | 1 | `repo_access` | repository public, not archived; submitter has `admin`/`maintain` (a response without GitHub's `permissions` field is refused: fail closed); owner id = publisher's. **Runs synchronously in `POST /submissions`** with the submitter's own token (the backend compares the owner id); the background `Resolve` repeats the reads with an empty user token. GitHub's three answers are kept apart: a 404 is `repo_private` (private or gone), a refused token is `github_token_invalid` (the submitter's sign-in; their repository may well be public - BRF-Tech/filex#118) or `github_unavailable` (the store's own token, after the anonymous retry), and an address that is not `owner/name` is `repo_address` | `repo_private`, `repo_address`, `repo_permission`, `owner_mismatch`, `github_token_invalid`, `github_unavailable` |
 | 2 | `tag` | `ref` is a **tag** (branches are refused: they move); resolved to its commit (annotated tags peeled); GitHub's tag signature verification recorded (informational) | `not_a_tag`, `tag_not_found` |
-| 3 | `manifest` | `filex-app.json` read **at the commit** (not the tag name), sha256 of the bytes, parsed leniently for name, version, kind, range, permissions, artifact addresses | `manifest_missing`, `manifest_unreadable`, `too_large` |
+| 3 | `manifest` | `filex-app.json` read **at the commit** (not the tag name), sha256 of the bytes, parsed leniently for name, version, kind, range, permissions, artifact addresses; the blocks of [setting an app up](#setting-an-app-up) (`routes`, `setup`, `link_shortener`, `user_permissions`) held to filex's own rules for them | `manifest_missing`, `manifest_unreadable`, `too_large` |
 | 4 | `consent` | `.filex-apps.json` at the commit, valid against the schema, names this publisher; every engine its `conversions` need is one the manifest asks for | `consent_missing`, `consent_publisher`, `consent_invalid` |
 | 5 | `policy` | **written by the backend against the database** (`internal/pipeline/policy.go`); the resolver does not produce it. Name: a new app must not take an existing or reserved name, a known app must keep its name, its repository id and its kind (`kind_changed`: an app, a language pack and a storage plugin never turn into one another; the approval and `UpdateAppListing` refuse it again); a name one edit away from a listed app is `warned`; version: valid semver, not already listed, higher than the newest unless marked a backport (`warned`); license: the one GitHub detects **at the tag's commit** (`GET /repos/{o}/{r}/license?ref=<commit>`), read right after the tag is resolved; when GitHub answers NOASSERTION there, the default branch's verdict is carried over only if the license file's blob at the commit is identical to the one that verdict judged (at most two extra calls, noted in the check data); none means `license_missing` | `name_taken`, `name_reserved`, `name_changed`, `repo_changed`, `publisher_changed`, `kind_changed`, `version_invalid`, `version_exists`, `license_missing` |
 | 6 | `artifacts` | module (`wasm.url`, `{tag}` expanded) and interface bundle (`ui.bundle.url`) downloaded through the guarded client, streamed to sha256 with size caps; the hashes must equal the manifest's | `sha256_mismatch`, `too_large`, `fetch_failed`, `host_not_allowed` |
@@ -468,6 +470,42 @@ filex re-reads the feed, holds this server's build to the store's pin, checks th
 installs it as its **From its source** would. A paid storage
 plugin is sold as an app is ([Licensing](#licensing-paid-apps)); filex keeps its license under a row of
 its own.
+
+### Setting an app up
+
+filex 0.60.0 lets an app be set up by an administrator after it is installed, before it runs, and
+gives it addresses of its own (docs/APP-PLUGINS-API.md in the filex repository, "Public routes",
+"Setting an app up", "The link-shortener role"). Four blocks of the manifest say what that asks:
+
+| Block | What it says | The store shows |
+|---|---|---|
+| `routes` | addresses the app answers for visitors with no account (a link shortener's `l.example.com/<code>`); each has no address until an administrator gives it one at setup; needs the `public_routes` permission | "Its own addresses: ...", with the path the setup suggests (`default_prefix`) |
+| `setup` | the app is set up once before it runs, starting with its own step (`setup.view`, a view with the `setup` placement); `setup.reset.warning` is what it says before setting it up again, or removing it, erases its data (the `data` permission) | "After installing it, an administrator sets this app up once", its own step, the warning in its words |
+| `link_shortener` | filex offers "Get short link" beside its own links and the app makes the short address on one of its routes; needs the `link_shortener` permission | "Makes filex's short links", and the user permission it `requires` |
+| `user_permissions` (filex 0.49.0) | what an administrator grants per role and per person inside the app, with who holds it until then (`default`) | "What people may do in it" |
+
+The **resolver** holds these blocks to filex's own rules at the `manifest` check
+(`internal/appsetup`): filex's public Go module (`github.com/brf-tech/filex/backend`, pinned in
+`go.mod` to the release the `latest` validator runs) provides `pkg/pluginkit/plugintest.InspectManifest`,
+the checks an app's author meets at `go test`, and it runs on a manifest made of the blocks alone (and
+the permissions and views they lean on). So a route without `public_routes`, a shortener on an
+undeclared route or a setup view the setup does not name fails with filex's sentence
+(`manifest_unreadable`, "filex-app.json: routes: the manifest declares routes but never asks for the
+public_routes permission"), while what a newer filex adds elsewhere in a manifest (a permission, a
+placement) stays the validators' to accept. The rules only filex's installer holds (a route's id and
+prefix shape, every declared language in every label, `requires` naming a user permission) are the
+validators' too: a 0.60 validator refuses such a manifest at the dry run. filex derives no permission
+from these blocks, so the dry run's rows are the manifest's own (`data`, `public_routes`,
+`link_shortener`).
+
+The **version page** reads the blocks from the manifest the version was approved with
+(`GET /api/v1/apps/{name}/versions/{version}` → `setup`, absent when the manifest declares none, and
+for a language pack or a storage plugin); nothing is stored apart, so a version approved before the
+store knew the blocks shows them too. The by-hand install steps end with "Then filex opens the app's
+setup" when it has one.
+
+When filex changes these rules, the store's `go.mod` moves to that release with the validators
+(Q7).
 
 ## Review and policy
 

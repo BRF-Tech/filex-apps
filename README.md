@@ -14,11 +14,12 @@ stores their filex trusts: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 1. **Publishing.** A publisher signs in with GitHub and submits a public repository at a **tag**. The
    repository holds `filex-app.json` (the app's manifest) and `.filex-apps.json` (the owner's consent
    to the listing and the listing's metadata, [schema](schema/filex-apps.schema.json)).
-2. **Checks.** The store resolves the tag to a commit, reads the manifest there, downloads the module
-   and the interface bundle (or a storage plugin's builds) and checks their SHA-256, mirrors the
-   screenshots, and asks **real filex servers** for their install review (a dry run) at the newest
-   supported filex and the oldest; a storage plugin's build runs on filex's plugin validator, with no
-   network.
+2. **Checks.** The store resolves the tag to a commit, reads the manifest there (what setting the app
+   up asks - its own addresses, a short-link role, its setup step - held to filex's own rules from
+   filex's Go module, and shown on the app's page), downloads the module and the interface bundle (or
+   a storage plugin's builds) and checks their SHA-256, mirrors the screenshots, and asks **real filex
+   servers** for their install review (a dry run) at the newest supported filex and the oldest; a
+   storage plugin's build runs on filex's plugin validator, with no network.
 3. **Review.** A reviewer reads the result and approves or rejects. Everyone signs in with GitHub; the
    reviewers and administrators are named by the store's operator (GitHub user ids, or the
    collaborators of a private repository).

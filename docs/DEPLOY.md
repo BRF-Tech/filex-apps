@@ -146,6 +146,10 @@ release:
 2. A dump, then `docker compose up -d --no-deps filex-latest filex-floor plugin-latest`.
 3. [filex's own file types](#filexs-own-file-types) generated again for the same release, in a store
    release of their own.
+4. In the same store release, when filex changed the rules for the blocks of setting an app up
+   (`routes`, `setup`, `link_shortener`; [ARCHITECTURE.md, "Setting an app up"](ARCHITECTURE.md#setting-an-app-up)):
+   `go get github.com/brf-tech/filex/backend@<release>` in `backend/`, so the store holds them to the
+   rules the new `filex-latest` holds them to.
 
 Each filex image is about 0.8 GB: check the host's free disk first. The validators check new
 submissions only; approved versions stay as they are.
@@ -159,6 +163,9 @@ and `co_edit` (`files:co-edit`: it edits a file together with other people throu
 The store knows the derived permissions whatever the validator (`resolve.IsDerivedPermission`); a
 manifest never lists them in `permissions` (filex refuses it there). A version whose range admits only
 one of the validators is checked on that one; the other reports `out_of_range`, which is normal.
+0.60 added `routes`, `setup` and `link_shortener` (an app that is set up after it is installed, with
+addresses of its own; the permissions `data`, `public_routes` and `link_shortener`, none derived): the
+store holds them to filex's own rules at the `manifest` check and shows them on the app's page.
 
 ## The plugin validator
 

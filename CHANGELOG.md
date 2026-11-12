@@ -4,6 +4,30 @@ Each release is a signed tag `v<version>` and the image `ghcr.io/brf-tech/filex-
 ([DEPLOY.md](docs/DEPLOY.md#deploying-a-new-version)). Migrations are listed when a release has
 them; a release without one runs on the previous schema and the previous release runs on its schema.
 
+## [0.1.2] - 2026-11-12
+
+No migration. Deploy as usual; rolling back to 0.1.1 needs nothing but the image.
+
+### Added
+
+- **Apps that are set up after they are installed (filex 0.60.0).** The pipeline's `manifest` check
+  holds the manifest's `routes`, `setup` and `link_shortener` blocks, and the permissions and views
+  they lean on, to filex's own rules: filex's public Go module (`github.com/brf-tech/filex/backend`
+  v0.60.0) runs its `plugintest.InspectManifest` on those blocks, and a breach fails the submission
+  with filex's sentence (`manifest_unreadable`). The rest of a manifest is still the validators' to
+  judge. The app page has a "Setting it up" section: the app's own setup step, its own addresses
+  (the setup asks where they live), the link-shortener role, the warning before its data is erased,
+  and what an administrator grants inside it (`user_permissions`, with who holds each until then);
+  the API's version detail carries it as `setup`. The permissions `data`, `public_routes` and
+  `link_shortener` have their own pictures.
+
+### Changed
+
+- **Validators: filex 0.60.0 (`latest`, `plugin-latest`) and 0.59.1 (`floor`)** in the example
+  compose, the end-to-end stack and `validators-it.sh`, as on the reference store.
+- **filex's own file types from filex 0.60.0** (`filex-builtin.json`): the same 160 kinds, five
+  sources on new lines.
+
 ## [0.1.1] - 2026-11-08
 
 No migration. Deploy as usual; rolling back to 0.1.0 needs nothing but the image.
