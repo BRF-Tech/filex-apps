@@ -48,6 +48,7 @@ repo_of() {
     filex-retro) echo BRF-Tech/filex-retro ;;
     filex-media-thumbs) echo BRF-Tech/filex-media-thumbs ;;
     filex-office-editor) echo BRF-Tech/filex-office-editor ;;
+    filex-shortlink) echo BRF-Tech/filex-shortlink ;;
     filex-lang-es) echo BRF-Tech/filex-lang-es ;;
     filex-lang-de) echo BRF-Tech/filex-lang-de ;;
     filex-lang-fr) echo BRF-Tech/filex-lang-fr ;;
@@ -65,6 +66,7 @@ app_of() {
     filex-retro) echo retro ;;
     filex-media-thumbs) echo media-thumbs ;;
     filex-office-editor) echo office-editor ;;
+    filex-shortlink) echo shortlink ;;
     filex-lang-es) echo lang-es ;;
     filex-lang-de) echo lang-de ;;
     filex-lang-fr) echo lang-fr ;;

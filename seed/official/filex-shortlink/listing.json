@@ -1,0 +1,14 @@
+{
+  "publisher": "brf-tech",
+  "categories": ["productivity"],
+  "summary": {
+    "en": "Short addresses for filex's shares, file requests and uploads, and, if you allow it, for any web address: l.example.com/aB3x9kQ2z on the address, alphabet and length you choose at setup, with click counts."
+  },
+  "description": "description.md",
+  "icon": "icon.png",
+  "screenshots": [
+    {"path": "screenshots/short-links.png", "caption": {"en": "The Short links page: your links, where each goes and its clicks"}},
+    {"path": "screenshots/setup-guessing.png", "caption": {"en": "The setup wizard: how hard a code is to guess, with a 45-bit floor"}},
+    {"path": "screenshots/app-page.png", "caption": {"en": "The app's page: its own data, public routes and the link-shortener role, and nothing else"}}
+  ]
+}

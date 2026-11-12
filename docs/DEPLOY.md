@@ -276,7 +276,7 @@ container. The commands are `publisher`, `import`, `conversions`, `publish-index
 
 **The filex project's own apps.** [`seed/official/`](../seed/official/) holds the listings of BRF
 Tech's apps (filex-sign, filex-convert, filex-drawio, filextext, filex-retro, filex-media-thumbs, the
-office editor, the language packs) as the reference store lists them, and
+office editor, filex-shortlink, the language packs) as the reference store lists them, and
 [`seed/official/import.sh`](../seed/official/import.sh) runs the commands above for them (publisher
 `brf-tech`, GitHub `BRF-Tech`), on the host of the store's container:
 
