@@ -23,12 +23,12 @@ func capsOf(t *testing.T, ext string) string {
 	return strings.Join(out, " ")
 }
 
-// The embedded data is filex 0.59.0 as scripts/gen-filex-builtin.mjs read
+// The embedded data is filex 0.60.0 as scripts/gen-filex-builtin.mjs read
 // it; these are the claims the catalog makes most, checked against what the
 // code at that tag does (the script's sources name the lines).
 func TestTheBuiltinDataSaysWhatFilexDoesByItself(t *testing.T) {
 	b := Builtin()
-	if b.Filex != "0.59.0" || b.Tag != "v0.59.0" || len(b.Commit) != 40 {
+	if b.Filex != "0.60.0" || b.Tag != "v0.60.0" || len(b.Commit) != 40 {
 		t.Fatalf("data from %s %s %s", b.Filex, b.Tag, b.Commit)
 	}
 	for ext, want := range map[string]string{

@@ -59,7 +59,7 @@ type Source struct {
 
 // Data is filex-builtin.json.
 type Data struct {
-	// Filex is the version the data describes ("0.59.0"), Tag and Commit
+	// Filex is the version the data describes ("0.60.0"), Tag and Commit
 	// where it was read.
 	Filex   string            `json:"filex"`
 	Tag     string            `json:"tag"`

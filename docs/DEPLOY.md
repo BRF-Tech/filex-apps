@@ -318,13 +318,13 @@ of [BRF-Tech/filex](https://github.com/BRF-Tech/filex) with the tag will do (the
 tag's commit there). It is plain Node (no packages).
 
 ```sh
-node scripts/gen-filex-builtin.mjs /path/to/filex v0.59.0 --check   # is the committed file what the tag says?
-node scripts/gen-filex-builtin.mjs /path/to/filex v0.60.0           # write it for another release
+node scripts/gen-filex-builtin.mjs /path/to/filex v0.60.0 --check   # is the committed file what the tag says?
+node scripts/gen-filex-builtin.mjs /path/to/filex v0.61.0           # write it for another release
 ```
 
 - **When**: with each filex release, together with the validators' image tags, so the panel speaks
   for the filex people install. The file records `filex`, `tag` and `commit`, and the page names that
-  version ("What filex 0.59.0 does with no app installed").
+  version ("What filex 0.60.0 does with no app installed").
 - **When it stops**: every list comes from one named place in filex (the preview's viewers and its
   Edit button, the server's rule of how a file is edited, the kinds ONLYOFFICE also opens, the
   thumbnail engine, the archive providers, the New menu, the settings, the default image's tools;
